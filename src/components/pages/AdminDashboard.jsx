@@ -22,27 +22,110 @@ import Button from "@/components/atoms/Button";
 import Error from "@/components/ui/Error";
 import Loading from "@/components/ui/Loading";
 
-// Image loading utilities with fallback support
-const ImageWithFallback = ({ src, alt, className, fallbackSrc = null, ...props }) => {
+// Enhanced image loading utilities with timeout and retry support
+const ImageWithFallback = ({ src, alt, className, fallbackSrc = null, timeout = 10000, ...props }) => {
   const [imageSrc, setImageSrc] = useState(src)
   const [imageError, setImageError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [retryCount, setRetryCount] = useState(0)
+  const timeoutRef = useRef(null)
+  const imgRef = useRef(null)
+
+  const createPlaceholderImage = useCallback(() => {
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 400
+      canvas.height = 300
+      const ctx = canvas.getContext('2d')
+      
+      // Background
+      ctx.fillStyle = '#f3f4f6'
+      ctx.fillRect(0, 0, 400, 300)
+      
+      // Text
+      ctx.fillStyle = '#6b7280'
+      ctx.font = '16px Inter, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('Image not available', 200, 150)
+      
+      return canvas.toDataURL()
+    } catch (error) {
+      console.error('Failed to create placeholder image:', error)
+      return null
+    }
+  }, [])
 
   const handleImageError = useCallback(() => {
-    console.warn(`Image failed to load: ${imageSrc}`)
+    const errorType = ErrorHandler.classifyError(new Error(`Image failed to load: ${imageSrc}`))
+    console.warn(`Image load error (${errorType}):`, imageSrc, `Retry ${retryCount}/2`)
+
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+
+    // Try fallback first, then retry, then placeholder
     if (fallbackSrc && imageSrc !== fallbackSrc) {
       setImageSrc(fallbackSrc)
       setImageError(false)
+      setRetryCount(0)
+    } else if (retryCount < 2 && ErrorHandler.shouldRetry(new Error(errorType), retryCount)) {
+      // Retry with exponential backoff
+      const delay = ErrorHandler.getRetryDelay(retryCount, 1000)
+      setTimeout(() => {
+        setRetryCount(prev => prev + 1)
+        setImageSrc(src) // Reset to original source
+        setImageError(false)
+      }, delay)
     } else {
-      setImageError(true)
+      // Final fallback to placeholder
+      const placeholder = createPlaceholderImage()
+      if (placeholder) {
+        setImageSrc(placeholder)
+        setImageError(false)
+      } else {
+        setImageError(true)
+      }
       setIsLoading(false)
     }
-  }, [imageSrc, fallbackSrc])
+  }, [imageSrc, fallbackSrc, retryCount, src, createPlaceholderImage])
 
   const handleImageLoad = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
     setIsLoading(false)
     setImageError(false)
+    setRetryCount(0)
   }, [])
+
+  // Set up timeout for image loading
+  useEffect(() => {
+    if (isLoading && !imageError) {
+      timeoutRef.current = setTimeout(() => {
+        console.warn(`Image loading timeout after ${timeout}ms:`, imageSrc)
+        handleImageError()
+      }, timeout)
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [imageSrc, isLoading, imageError, timeout, handleImageError])
+
+  // Reset state when src changes
+  useEffect(() => {
+    setImageSrc(src)
+    setIsLoading(true)
+    setImageError(false)
+    setRetryCount(0)
+  }, [src])
 
   if (imageError) {
     return (
@@ -60,12 +143,14 @@ const ImageWithFallback = ({ src, alt, className, fallbackSrc = null, ...props }
         </div>
       )}
       <img
+        ref={imgRef}
         src={imageSrc}
         alt={alt}
         className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
         onError={handleImageError}
         onLoad={handleImageLoad}
         loading="lazy"
+        crossOrigin="anonymous"
         {...props}
       />
     </div>

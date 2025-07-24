@@ -1,16 +1,21 @@
+import React from "react";
+import Error from "@/components/ui/Error";
 // Comprehensive error handling utilities
 export class ErrorHandler {
   static classifyError(error) {
     const message = error.message?.toLowerCase() || '';
     
-    // Image loading specific errors
-    if (message.includes('error loading image') || message.includes('image') || message.includes('cors')) {
+// Image loading specific errors with enhanced timeout detection
+    if (message.includes('error loading image') || message.includes('image') || message.includes('cors') || 
+        message.includes('crossorigin') || message.includes('tainted')) {
       return 'image-load';
     }
     if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
       return 'network';
     }
-    if (message.includes('timeout') || message.includes('deadline') || message.includes('13109ms')) {
+    // Enhanced timeout detection for various patterns including the specific 13749ms error
+    if (message.includes('timeout') || message.includes('deadline') || 
+        /\d{4,}ms/.test(message) || message.includes('13749ms') || message.includes('13109ms')) {
       return 'timeout';
     }
     if (message.includes('validation') || message.includes('invalid') || message.includes('parse')) {
@@ -111,12 +116,25 @@ export const withErrorHandling = (serviceMethod, context) => {
 };
 
 // Image loading utilities with retry and fallback
+// Enhanced image loading utilities with retry and CORS handling
 export class ImageLoader {
-  static async loadImageWithFallback(primaryUrl, fallbackUrl = null, timeout = 10000) {
+  static async loadImageWithFallback(primaryUrl, fallbackUrl = null, timeout = 10000, retryCount = 0, maxRetries = 2) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const timeoutId = setTimeout(() => {
-        reject(new Error(`Image loading timeout after ${timeout}ms: ${primaryUrl}`));
+        const timeoutError = new Error(`Image loading timeout after ${timeout}ms: ${primaryUrl}`);
+        
+        if (retryCount < maxRetries) {
+          // Retry with exponential backoff
+          const delay = ErrorHandler.getRetryDelay(retryCount);
+          setTimeout(() => {
+            this.loadImageWithFallback(primaryUrl, fallbackUrl, timeout, retryCount + 1, maxRetries)
+              .then(resolve)
+              .catch(reject);
+          }, delay);
+        } else {
+          reject(timeoutError);
+        }
       }, timeout);
 
       img.onload = () => {
@@ -124,20 +142,42 @@ export class ImageLoader {
         resolve(primaryUrl);
       };
 
-      img.onerror = () => {
+      img.onerror = (event) => {
         clearTimeout(timeoutId);
-        if (fallbackUrl) {
-          // Try fallback image
-          const fallbackImg = new Image();
-          fallbackImg.onload = () => resolve(fallbackUrl);
-          fallbackImg.onerror = () => reject(new Error(`Both primary and fallback images failed to load`));
-          fallbackImg.src = fallbackUrl;
+        const errorMsg = `Image failed to load: ${primaryUrl}`;
+        console.error('Image load error:', event, errorMsg);
+        
+        if (fallbackUrl && primaryUrl !== fallbackUrl) {
+          // Try fallback image with same retry logic
+          this.loadImageWithFallback(fallbackUrl, null, timeout, 0, maxRetries)
+            .then(resolve)
+            .catch(() => {
+              // If fallback also fails, create placeholder
+              const placeholder = this.createPlaceholderDataUrl(400, 300, 'Image unavailable');
+              resolve(placeholder);
+            });
+        } else if (retryCount < maxRetries) {
+          // Retry original image
+          const delay = ErrorHandler.getRetryDelay(retryCount);
+          setTimeout(() => {
+            this.loadImageWithFallback(primaryUrl, fallbackUrl, timeout, retryCount + 1, maxRetries)
+              .then(resolve)
+              .catch(reject);
+          }, delay);
         } else {
-          reject(new Error(`Image failed to load: ${primaryUrl}`));
+          // Final fallback to placeholder
+          const placeholder = this.createPlaceholderDataUrl(400, 300, 'Image unavailable');
+          resolve(placeholder);
         }
       };
 
-      img.src = primaryUrl;
+      // Set crossOrigin for CORS handling
+      try {
+        img.crossOrigin = 'anonymous';
+      } catch (corsError) {
+        console.warn('CORS not supported, trying without:', corsError);
+      }
+img.src = primaryUrl;
     });
   }
 
