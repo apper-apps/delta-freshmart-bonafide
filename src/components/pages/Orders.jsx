@@ -162,10 +162,9 @@ Rejected
                       )}
                     </div>
                   )}
-                </div>
+</div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
                   {(order.paymentMethod === 'jazzcash' || order.paymentMethod === 'easypaisa' || order.paymentMethod === 'bank') && (
-                {(order.paymentMethod === 'jazzcash' || order.paymentMethod === 'easypaisa' || order.paymentMethod === 'bank') && (
                   <div className="flex items-center space-x-1">
                     {order.verificationStatus === 'verified' && (
                       <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center">
