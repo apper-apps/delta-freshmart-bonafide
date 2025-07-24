@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { addRealTimeNotification, approveRequest, fetchPendingApprovals, rejectRequest, selectApprovalLoading, selectPendingApprovals, selectRealTimeUpdates, setConnectionStatus, updateApprovalStatus } from "@/store/approvalWorkflowSlice";
 import { fetchNotificationCounts, resetCount, setError, setLoading, updateCounts } from "@/store/notificationSlice";
 import { store } from "@/store/index";
+import { ErrorHandler, classifyError, createUserFriendlyMessage, withErrorHandling } from "@/utils/errorHandling";
 import webSocketService from "@/services/api/websocketService";
 import { paymentService } from "@/services/api/paymentService";
 import { notificationService } from "@/services/api/notificationService";
@@ -21,9 +22,59 @@ import Button from "@/components/atoms/Button";
 import Error from "@/components/ui/Error";
 import Loading from "@/components/ui/Loading";
 
-const AdminDashboard = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+// Image loading utilities with fallback support
+const ImageWithFallback = ({ src, alt, className, fallbackSrc = null, ...props }) => {
+  const [imageSrc, setImageSrc] = useState(src)
+  const [imageError, setImageError] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const handleImageError = useCallback(() => {
+    console.warn(`Image failed to load: ${imageSrc}`)
+    if (fallbackSrc && imageSrc !== fallbackSrc) {
+      setImageSrc(fallbackSrc)
+      setImageError(false)
+    } else {
+      setImageError(true)
+      setIsLoading(false)
+    }
+  }, [imageSrc, fallbackSrc])
+
+  const handleImageLoad = useCallback(() => {
+    setIsLoading(false)
+    setImageError(false)
+  }, [])
+
+  if (imageError) {
+    return (
+      <div className={`${className} bg-gray-200 flex items-center justify-center`} {...props}>
+        <ApperIcon name="ImageOff" className="w-8 h-8 text-gray-400" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative">
+      {isLoading && (
+        <div className={`${className} bg-gray-200 animate-pulse flex items-center justify-center absolute inset-0`}>
+          <ApperIcon name="Loader2" className="w-6 h-6 text-gray-400 animate-spin" />
+        </div>
+      )}
+      <img
+        src={imageSrc}
+        alt={alt}
+        className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+        loading="lazy"
+        {...props}
+      />
+    </div>
+  )
+}
+
+function AdminDashboard() {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
   const notificationCounts = useSelector(state => state.notifications.counts);
   const pendingApprovals = useSelector(selectPendingApprovals);
   const approvalLoading = useSelector(selectApprovalLoading);
@@ -99,23 +150,37 @@ const [selectedApproval, setSelectedApproval] = useState(null);
   });
   const [exportLoading, setExportLoading] = useState(false);
   const reportRefreshRef = useRef(null);
+// Load dashboard data with enhanced error handling
 const loadDashboardData = async () => {
-    setLoading(true);
     try {
-      // Load products and check for low stock
-      const products = await productService.getAll();
-      const orders = await orderService.getAll();
+      setLoading(true)
+      setError(null)
       
-      // Calculate low stock products (stock < 10)
-      const lowStock = products.filter(product => (product?.stock || 0) < 10);
-      setLowStockProducts(lowStock || []);
-      // Get today's orders
-      const today = new Date()
-      const todayOrdersData = orders.filter(order => {
-        const orderDate = new Date(order.createdAt)
+      // Use error handling wrapper for service calls
+      const products = await withErrorHandling(
+        () => productService.getAll(),
+        'Loading products'
+      )()
+      
+      const orders = await withErrorHandling(
+        () => orderService.getAll(), 
+        'Loading orders'
+      )()
+      
+      // Calculate low stock products (stock < 10) with null safety
+      const lowStock = (products || []).filter(product => {
+        const stock = product?.stock ?? 0
+        return typeof stock === 'number' && stock < 10
+      })
+      setLowStockProducts(lowStock)
+      
+      // Calculate today's statistics
+// Calculate today's statistics
+      const today = new Date();
+      const todayOrdersData = (orders || []).filter(order => {
+        const orderDate = new Date(order?.createdAt || new Date());
         return orderDate.toDateString() === today.toDateString()
       })
-      setTodayOrders(todayOrdersData || [])
 
       // Calculate today's revenue with safe defaults
       const todayRevenueAmount = todayOrdersData.reduce((sum, order) => {
@@ -151,14 +216,33 @@ const loadDashboardData = async () => {
         totalTransactions: (walletTransactionsData || []).length,
         monthlyRevenue: monthlyRevenue || 0,
         pendingVerifications: (pendingVerifications || []).length,
-        todayRevenue: todayRevenueAmount || 0
+todayRevenue: todayRevenueAmount || 0
       });
-
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
-      setError('Failed to load dashboard data');
+      console.error('Error loading dashboard data:', error)
+      
+      // Enhanced error handling with specific messaging
+      const errorType = ErrorHandler.classifyError(error)
+      let errorMessage = 'Failed to load dashboard data'
+      
+      switch (errorType) {
+        case 'network':
+          errorMessage = 'Network connection issue. Please check your internet connection and try again.'
+          break
+        case 'timeout':
+          errorMessage = 'Request timed out. The server is taking too long to respond.'
+          break
+        case 'server':
+          errorMessage = 'Server error occurred. Please try again in a few moments.'
+          break
+        default:
+          errorMessage = ErrorHandler.createUserFriendlyMessage(error, 'Dashboard loading')
+      }
+      
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
 };
 

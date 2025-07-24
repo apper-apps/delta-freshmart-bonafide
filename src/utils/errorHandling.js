@@ -3,10 +3,14 @@ export class ErrorHandler {
   static classifyError(error) {
     const message = error.message?.toLowerCase() || '';
     
+    // Image loading specific errors
+    if (message.includes('error loading image') || message.includes('image') || message.includes('cors')) {
+      return 'image-load';
+    }
     if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
       return 'network';
     }
-    if (message.includes('timeout') || message.includes('deadline')) {
+    if (message.includes('timeout') || message.includes('deadline') || message.includes('13109ms')) {
       return 'timeout';
     }
     if (message.includes('validation') || message.includes('invalid') || message.includes('parse')) {
@@ -25,15 +29,17 @@ export class ErrorHandler {
     return 'general';
   }
 
-  static createUserFriendlyMessage(error, context = '') {
+static createUserFriendlyMessage(error, context = '') {
     const type = this.classifyError(error);
     const contextPrefix = context ? `${context}: ` : '';
     
     switch (type) {
+      case 'image-load':
+        return `${contextPrefix}Image failed to load. Using fallback image.`;
       case 'network':
         return `${contextPrefix}Network connection issue. Please check your internet connection and try again.`;
       case 'timeout':
-        return `${contextPrefix}Request timed out. Please try again.`;
+        return `${contextPrefix}Request timed out. The server is taking too long to respond.`;
       case 'server':
         return `${contextPrefix}Server error occurred. Please try again in a few moments.`;
       case 'validation':
@@ -47,11 +53,12 @@ export class ErrorHandler {
     }
   }
 
-  static shouldRetry(error, attemptCount = 0, maxRetries = 3) {
+static shouldRetry(error, attemptCount = 0, maxRetries = 3) {
     if (attemptCount >= maxRetries) return false;
     
     const type = this.classifyError(error);
-    return ['network', 'timeout', 'server'].includes(type);
+    // Include image-load errors for retry with different strategy
+    return ['network', 'timeout', 'server', 'image-load'].includes(type);
   }
 
   static getRetryDelay(attemptCount, baseDelay = 1000) {
@@ -99,6 +106,77 @@ export const withErrorHandling = (serviceMethod, context) => {
         
         throw new Error(ErrorHandler.createUserFriendlyMessage(error, context));
       }
-    }
+}
   };
 };
+
+// Image loading utilities with retry and fallback
+export class ImageLoader {
+  static async loadImageWithFallback(primaryUrl, fallbackUrl = null, timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Image loading timeout after ${timeout}ms: ${primaryUrl}`));
+      }, timeout);
+
+      img.onload = () => {
+        clearTimeout(timeoutId);
+        resolve(primaryUrl);
+      };
+
+      img.onerror = () => {
+        clearTimeout(timeoutId);
+        if (fallbackUrl) {
+          // Try fallback image
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => resolve(fallbackUrl);
+          fallbackImg.onerror = () => reject(new Error(`Both primary and fallback images failed to load`));
+          fallbackImg.src = fallbackUrl;
+        } else {
+          reject(new Error(`Image failed to load: ${primaryUrl}`));
+        }
+      };
+
+      img.src = primaryUrl;
+    });
+  }
+
+  static createPlaceholderDataUrl(width = 400, height = 300, text = 'Image not available') {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    // Background
+    ctx.fillStyle = '#f3f4f6';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Text
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '16px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2, height / 2);
+    
+    return canvas.toDataURL();
+  }
+
+  static preloadImages(urls, onProgress = null) {
+    return Promise.allSettled(
+      urls.map((url, index) => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            if (onProgress) onProgress(index + 1, urls.length);
+            resolve(url);
+          };
+          img.onerror = () => {
+            if (onProgress) onProgress(index + 1, urls.length);
+            reject(new Error(`Failed to preload: ${url}`));
+          };
+          img.src = url;
+        });
+      })
+    );
+  }
+}
