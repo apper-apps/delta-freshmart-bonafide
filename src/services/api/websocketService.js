@@ -435,8 +435,7 @@ console.error('Max reconnection attempts reached, giving up');
             JSON.stringify(value);
             serialized[key] = value;
           } catch (serializationError) {
-            // If serialization fails, convert to string
-            serialized[key] = String(value);
+            serialized[key] = String(error[key]);
           }
         }
         
@@ -450,7 +449,6 @@ console.error('Max reconnection attempts reached, giving up');
       return 'Serialization failed: ' + String(error);
     }
   }
-  
   // Safe message serialization to prevent DataCloneError
   serializeMessageSafely(message) {
     if (!message) return null;

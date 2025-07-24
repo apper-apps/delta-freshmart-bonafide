@@ -4,7 +4,6 @@ import ApperIcon from "@/components/ApperIcon";
 import Button from "@/components/atoms/Button";
 import Error from "@/components/ui/Error";
 import Loading from "@/components/ui/Loading";
-import DeliveryDashboard from "@/components/pages/AdminDashboard";
 import Orders from "@/components/pages/Orders";
 import { orderService } from "@/services/api/orderService";
 import { deliveryPersonnelService } from "@/services/api/deliveryPersonnelService";

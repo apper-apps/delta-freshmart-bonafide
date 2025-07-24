@@ -3,14 +3,14 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
 import { formatCurrency } from "@/utils/currency";
-import ApperIcon from "@/components/ApperIcon";
-import { Badge } from "@/components/atoms/Badge";
-import Empty from "@/components/ui/Empty";
-import Error from "@/components/ui/Error";
-import Loading from "@/components/ui/Loading";
-import OrderStatusBadge from "@/components/molecules/OrderStatusBadge";
 import { clipboardService } from "@/services/ClipboardService";
 import { orderService } from "@/services/api/orderService";
+import ApperIcon from "@/components/ApperIcon";
+import { Badge } from "@/components/atoms/Badge";
+import OrderStatusBadge from "@/components/molecules/OrderStatusBadge";
+import Error from "@/components/ui/Error";
+import Empty from "@/components/ui/Empty";
+import Loading from "@/components/ui/Loading";
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -160,54 +160,55 @@ className="flex items-center space-x-2 text-primary hover:text-primary-dark tran
                           <ApperIcon name="XCircle" size={12} className="mr-1" />
                           Rejected
                         </Badge>
-                      )}
-</div>
-                  )}
-                </div>
-                <>
-                  {(order.paymentMethod === 'jazzcash' || order.paymentMethod === 'easypaisa' || order.paymentMethod === 'bank') && (
-                    <div className="flex items-center space-x-1">
-                      {order.verificationStatus === 'verified' && (
-                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center">
-                          <ApperIcon name="CheckCircle" size={12} className="mr-1" />
-                          Payment Verified
-                        </span>
-                      )}
-                      {order.verificationStatus === 'rejected' && (
-                        <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full flex items-center">
-                          <ApperIcon name="XCircle" size={12} className="mr-1" />
-                          Payment Rejected
-                        </span>
-                      )}
-                      {order.verificationStatus === 'pending' && (
-                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center">
-                          <ApperIcon name="Clock" size={12} className="mr-1" />
-                          Pending Verification
-                        </span>
-                      )}
+)}
                     </div>
                   )}
-                  <div className="text-right sm:text-left sm:mt-2">
-                    <p className="text-lg sm:text-xl font-bold gradient-text">
-                      {(() => {
-                        // Calculate subtotal if order total is missing or zero
-                        if (!order?.total || order.total === 0) {
-                          const itemsSubtotal = order?.items?.reduce((sum, item) => {
-                            return sum + ((item.price || 0) * (item.quantity || 0));
-                          }, 0) || 0;
-                          const deliveryCharge = order?.deliveryCharge || 0;
-                          return formatCurrency(itemsSubtotal + deliveryCharge);
-                        }
-                        return formatCurrency(order.total);
-                      })()}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-600">
-                      {order?.items?.length || 0} items
-                    </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+                {(order.paymentMethod === 'jazzcash' || order.paymentMethod === 'easypaisa' || order.paymentMethod === 'bank') && (
+                  <div className="flex items-center space-x-1">
+                    {order.verificationStatus === 'verified' && (
+                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center">
+                        <ApperIcon name="CheckCircle" size={12} className="mr-1" />
+                        Payment Verified
+                      </span>
+                    )}
+                    {order.verificationStatus === 'rejected' && (
+                      <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full flex items-center">
+                        <ApperIcon name="XCircle" size={12} className="mr-1" />
+                        Payment Rejected
+                      </span>
+                    )}
+                    {order.verificationStatus === 'pending' && (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center">
+                        <ApperIcon name="Clock" size={12} className="mr-1" />
+                        Pending Verification
+                      </span>
+                    )}
                   </div>
-                </>
+                )}
+                <div className="text-right sm:text-left sm:mt-2">
+                  <p className="text-lg sm:text-xl font-bold gradient-text">
+                    {(() => {
+                      // Calculate subtotal if order total is missing or zero
+                      if (!order?.total || order.total === 0) {
+                        const itemsSubtotal = order?.items?.reduce((sum, item) => {
+                          return sum + ((item.price || 0) * (item.quantity || 0));
+                        }, 0) || 0;
+                        const deliveryCharge = order?.deliveryCharge || 0;
+                        return formatCurrency(itemsSubtotal + deliveryCharge);
+                      }
+                      return formatCurrency(order.total);
+                    })()}
+                  </p>
+                  <p className="text-xs sm:text-sm text-gray-600">
+                    {order?.items?.length || 0} items
+                  </p>
+                </div>
               </div>
             </div>
+          </div>
 
             {/* Mini Status Timeline for Mobile */}
             <div className="block sm:hidden mb-4">
@@ -250,8 +251,8 @@ className="flex items-center space-x-2 text-primary hover:text-primary-dark tran
                           <div className="w-2 h-2 bg-primary rounded-full mt-1 animate-pulse"></div>
                         )}
                       </div>
-                    );
-})}
+);
+                  })}
                 </div>
               </div>
             </div>
@@ -373,10 +374,10 @@ className="flex items-center space-x-2 text-primary hover:text-primary-dark tran
                                   document.body.appendChild(modal);
                                 }}
                               />
-                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center rounded-lg transition-all">
+<div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center rounded-lg transition-all">
                                 <ApperIcon name="Eye" size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>
-</div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -384,7 +385,8 @@ className="flex items-center space-x-2 text-primary hover:text-primary-dark tran
                   </div>
                 )}
               </div>
-              
+                )}
+              </div>
 {/* Order Items Preview */}
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <h4 className="text-sm font-medium text-gray-900 mb-3">Items ({order?.items?.length || 0})</h4>
@@ -463,8 +465,8 @@ className="flex items-center space-x-2 text-primary hover:text-primary-dark tran
                 </Link>
                 
                 <button className="flex items-center space-x-1 sm:space-x-2 text-blue-600 hover:text-blue-700 transition-colors text-sm bg-blue-50 px-3 py-1.5 rounded-lg">
-                  <ApperIcon name="MessageCircle" size={14} />
-<span>Chat Support</span>
+<ApperIcon name="MessageCircle" size={14} />
+                  <span>Chat Support</span>
                 </button>
                 {order.status === 'delivered' && (
                   <button className="flex items-center space-x-1 sm:space-x-2 text-green-600 hover:text-green-700 transition-colors text-sm bg-green-50 px-3 py-1.5 rounded-lg">
@@ -506,8 +508,8 @@ className="flex items-center space-x-2 text-primary hover:text-primary-dark tran
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-purple-700">Amount:</span>
-<span className="font-semibold text-purple-900">
+<span className="text-purple-700">Amount:</span>
+                      <span className="font-semibold text-purple-900">
                         {formatCurrency(order.walletTransaction.amount)}
                       </span>
                     </div>

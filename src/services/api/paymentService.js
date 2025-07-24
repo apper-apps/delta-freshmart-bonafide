@@ -1490,10 +1490,10 @@ generateFileUrl(fileName) {
         });
       }
     }
-
-    return results;
+return results;
   }
 
+  // Enhanced Recurring Payment Processing with Detailed Error Handling
   async processScheduledPayment(scheduledPayment) {
     try {
       const recurring = this.recurringPayments.find(r => r.Id === scheduledPayment.recurringPaymentId);
@@ -1560,30 +1560,33 @@ generateFileUrl(fileName) {
       // Mark scheduled payment as completed
       scheduledPayment.status = 'completed';
       scheduledPayment.processedAt = new Date().toISOString();
-      scheduledPayment.paymentId = payment.Id;
+scheduledPayment.paymentId = payment.Id;
 
       return { success: true, payment };
 
     } catch (error) {
-      // Handle payment failure
-      recurring.totalPayments++;
-      recurring.failedPayments++;
-      recurring.lastPaymentDate = new Date().toISOString();
-      recurring.lastPaymentStatus = 'failed';
+      // Handle payment failure - get recurring payment reference
+      const recurring = this.recurringPayments.find(r => r.Id === scheduledPayment.recurringPaymentId);
+      if (recurring) {
+        recurring.totalPayments++;
+        recurring.failedPayments++;
+        recurring.lastPaymentDate = new Date().toISOString();
+        recurring.lastPaymentStatus = 'failed';
+      }
       
       // Mark scheduled payment as failed
       scheduledPayment.status = 'failed';
-      scheduledPayment.failedAt = new Date().toISOString();
+scheduledPayment.failedAt = new Date().toISOString();
       scheduledPayment.failureReason = error.message;
       scheduledPayment.retryCount = (scheduledPayment.retryCount || 0) + 1;
 
       // Handle retry logic
-      if (recurring.autoRetry && scheduledPayment.retryCount < recurring.maxRetries) {
+      if (recurring && recurring.autoRetry && scheduledPayment.retryCount < recurring.maxRetries) {
         // Schedule retry
         const retryDate = new Date();
         retryDate.setHours(retryDate.getHours() + recurring.retryInterval);
         
-        const retryPayment = {
+const retryPayment = {
           Id: this.scheduledPaymentIdCounter++,
           recurringPaymentId: recurring.Id,
           scheduledDate: retryDate.toISOString(),
@@ -1598,7 +1601,7 @@ generateFileUrl(fileName) {
         this.scheduledPayments.push(retryPayment);
       } else {
         // Max retries reached or auto-retry disabled
-        if (scheduledPayment.retryCount >= recurring.maxRetries) {
+        if (recurring && scheduledPayment.retryCount >= recurring.maxRetries) {
           recurring.status = 'failed';
           recurring.failedAt = new Date().toISOString();
           recurring.failureReason = `Max retries (${recurring.maxRetries}) exceeded`;
