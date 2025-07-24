@@ -443,14 +443,6 @@ return (
         <WebSocketProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-background">
-            {/* Minimal SDK Status Indicator (only in development) */}
-            {import.meta.env.DEV && sdkError && (
-              <div className="fixed top-0 right-0 z-50 p-2 text-xs">
-                <div className="px-2 py-1 rounded bg-orange-500 text-white">
-                  SDK: Background Loading
-                </div>
-              </div>
-            )}
             <Suspense fallback={<Loading type="page" />}>
               <Routes>
                 <Route path="/" element={<Layout />}>
