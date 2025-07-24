@@ -110,10 +110,10 @@ window.addEventListener('unhandledrejection', (event) => {
     
     // Prevent the error from breaking the application
     event.preventDefault();
+event.preventDefault();
     return false;
   }
 });
-
 // Enhanced postMessage interception with better error recovery
 const originalPostMessage = window.postMessage;
 const postMessageState = {
@@ -124,15 +124,14 @@ const postMessageState = {
 
 window.postMessage = function(message, targetOrigin, transfer) {
   const attemptKey = `${targetOrigin}:${Date.now()}`;
-try {
+  try {
     // Test if message can be cloned
     window.structuredClone(message);
     return originalPostMessage.call(this, message, targetOrigin, transfer);
   } catch (error) {
     if (error.name === 'DataCloneError') {
       console.warn('PostMessage DataCloneError prevented, sanitizing message');
-      
-      try {
+try {
         const sanitizedMessage = serializeForPostMessage(message);
         return originalPostMessage.call(this, sanitizedMessage, targetOrigin, transfer);
       } catch (sanitizeError) {
@@ -159,9 +158,8 @@ window.addEventListener('message', (event) => {
     // Safely handle messages from external origins
     if (event?.origin && event.origin.includes('apper.io')) {
       console.log('Message from Apper script:', event.data);
-      
-      // If the message contains URL objects, convert them
-if (event.data && typeof event.data === 'object') {
+// If the message contains URL objects, convert them
+      if (event.data && typeof event.data === 'object') {
         const sanitizedData = serializeForPostMessage(event.data);
         // Forward sanitized message to any listeners
         window.dispatchEvent(new window.CustomEvent('apper-message', {
@@ -365,9 +363,10 @@ const sendSafeMessage = (targetWindow, message, targetOrigin = "*") => {
       // Check if window is still accessible
       if (targetWindow.closed) {
         console.warn('Target window is closed');
-        return false;
+return false;
       }
-// Test if message can be cloned first
+      
+      // Test if message can be cloned first
       try {
         window.structuredClone(message);
         targetWindow.postMessage(message, targetOrigin);
@@ -429,10 +428,8 @@ const handleMessage = (event) => {
       return;
     }
     
-    try {
+try {
       const sanitizedData = serializeForPostMessage(event.data);
-console.log('Received sanitized message from Apper:', sanitizedData);
-      
       // Dispatch custom event for app components to listen to
       window.dispatchEvent(new window.CustomEvent('apper-safe-message', {
         detail: {
@@ -482,10 +479,8 @@ static async loadInBackground() {
       console.log('SDK loaded successfully in background');
       return this.messageHandler;
       
-    } catch (error) {
+} catch (error) {
       console.warn('SDK background loading failed:', error);
-performanceMonitor.trackError(error, 'sdk-load-error');
-      
       // Enhanced error recovery with user notification
       if (this.retryCount < this.maxRetries) {
         this.retryCount++;
@@ -541,14 +536,12 @@ performanceMonitor.trackError(error, 'sdk-load-error');
     });
   }
   
-  static handleSDKError(event) {
+static handleSDKError(event) {
     console.error('SDK Error:', event.detail);
-    performanceMonitor.trackError(new Error(event.detail.message), 'sdk-runtime-error');
-    
     // Enhanced error reporting with classification
-    if (event.detail?.message) {
+if (event.detail?.message) {
       const errorType = this.classifyError(event.detail.message);
-      performanceMonitor.trackError(new Error(event.detail.message), `sdk-${errorType}-error`);
+      console.warn(`SDK ${errorType} error:`, event.detail.message);
     }
   }
   
@@ -831,9 +824,7 @@ async function initializeSDK() {
     performanceMonitor.trackError(error, 'sdk-init-error');
   }
 }
-// Missing function for SDK message handling
-
-// Missing function for SDK message handling
+// SDK message handling function
 const handleSDKMessage = (event) => {
   try {
     if (event.origin && event.origin.includes('apper.io')) {
