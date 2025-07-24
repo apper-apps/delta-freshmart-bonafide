@@ -433,12 +433,11 @@ console.error('Max reconnection attempts reached, giving up');
             
             // Try to serialize the value
             JSON.stringify(value);
-            serialized[key] = value;
+serialized[key] = value;
           } catch (serializationError) {
             serialized[key] = String(error[key]);
           }
         }
-        
         serialized.timestamp = new Date().toISOString();
         return serialized;
       }
@@ -510,13 +509,13 @@ console.error('Max reconnection attempts reached, giving up');
               serialized[key] = `[${value.constructor.name}]`;
               continue;
             }
-            
-            // Skip Window objects
-            if (typeof Window !== 'undefined' && value instanceof Window) {
+// Skip Window objects
+            if (typeof window !== 'undefined' && typeof window.Window !== 'undefined' && value instanceof window.Window) {
               serialized[key] = `[${value.constructor.name}]`;
               continue;
             }
             
+            // Handle URL objects
             // Handle URL objects
             if (value instanceof URL) {
               serialized[key] = {

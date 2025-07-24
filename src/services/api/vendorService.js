@@ -445,14 +445,10 @@ async createVendor(vendorData) {
     return maxId + 1;
   }
 
-  isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
 isValidEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
-
   isValidPhone(phone) {
     const phoneRegex = /^[+]?[\d\s\-()]{10,}$/;
     return phoneRegex.test(phone);

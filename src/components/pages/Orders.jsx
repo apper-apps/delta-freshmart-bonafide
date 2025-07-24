@@ -2,11 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "react-toastify";
-import { formatCurrency } from "@/utils/currency";
-import { clipboardService } from "@/services/ClipboardService";
+import formatCurrency from "@/utils/currency";
+import clipboardService from "@/services/ClipboardService";
 import { orderService } from "@/services/api/orderService";
 import ApperIcon from "@/components/ApperIcon";
-import { Badge } from "@/components/atoms/Badge";
+import Badge from "@/components/atoms/Badge";
 import OrderStatusBadge from "@/components/molecules/OrderStatusBadge";
 import Error from "@/components/ui/Error";
 import Empty from "@/components/ui/Empty";
@@ -512,7 +512,7 @@ className="flex items-center space-x-2 text-primary hover:text-primary-dark tran
                       <span className="font-semibold text-purple-900">
                         {formatCurrency(order.walletTransaction.amount)}
                       </span>
-                    </div>
+</div>
                   </div>
                 </div>
               )}

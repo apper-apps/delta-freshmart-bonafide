@@ -1,10 +1,9 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
-import { persistReducer, persistStore, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from "redux-persist";
+import { FLUSH, PAUSE, PERSIST, PURGE, REGISTER, REHYDRATE, persistReducer, persistStore } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import cartSlice from "./cartSlice";
 import notificationSlice from "./notificationSlice";
 import approvalWorkflowSlice from "./approvalWorkflowSlice";
-
 const persistConfig = {
   key: 'root',
   storage,
@@ -21,7 +20,7 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
   reducer: persistedReducer,
-  middleware: (getDefaultMiddleware) =>
+middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       devTools: typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production',
       serializableCheck: {
@@ -36,10 +35,8 @@ export const store = configureStore({
           'persist/REHYDRATE',
           'approvalWorkflow/setConnectionStatus'
         ],
-        ignoredActionsPaths: ['meta.arg', 'payload.timestamp'],
-        ignoredPaths: ['items.register'],
-      },
-    }),
+      }
+    })
 });
 
 export const persistor = persistStore(store);

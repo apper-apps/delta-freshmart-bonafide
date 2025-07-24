@@ -1564,7 +1564,7 @@ scheduledPayment.paymentId = payment.Id;
 
       return { success: true, payment };
 
-    } catch (error) {
+} catch (error) {
       // Handle payment failure - get recurring payment reference
       const recurring = this.recurringPayments.find(r => r.Id === scheduledPayment.recurringPaymentId);
       if (recurring) {

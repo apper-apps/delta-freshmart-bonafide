@@ -48,6 +48,7 @@ export const useCart = () => {
   const getCartTotal = () => cartTotal;
   const getCartCount = () => cartCount;
   
+  // Custom hooks for product cart status
   const useIsProductInCart = (productId) => {
     return useSelector(selectIsProductInCart(productId));
   };

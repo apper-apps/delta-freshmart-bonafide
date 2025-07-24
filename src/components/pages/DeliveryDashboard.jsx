@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import clipboardService from "@/services/ClipboardService";
+import { deliveryPersonnelService } from "@/services/api/deliveryPersonnelService";
+import { orderService } from "@/services/api/orderService";
 import ApperIcon from "@/components/ApperIcon";
+import Orders from "@/components/pages/Orders";
 import Button from "@/components/atoms/Button";
 import Error from "@/components/ui/Error";
 import Loading from "@/components/ui/Loading";
-import Orders from "@/components/pages/Orders";
-import { orderService } from "@/services/api/orderService";
-import { deliveryPersonnelService } from "@/services/api/deliveryPersonnelService";
-import { clipboardService } from "@/services/clipboardService";
 
-const DeliveryDashboard = () => {
+function DeliveryDashboard() {
   const [orders, setOrders] = useState([]);
   const [personnel, setPersonnel] = useState([]);
   const [loading, setLoading] = useState(true);
