@@ -52,21 +52,28 @@ class SessionService {
         };
       }
       
-      if (!session || typeof session !== 'object') {
-        console.warn('SessionService: No active session found');
-        // Try to initialize a guest session as fallback
+if (!session || typeof session !== 'object') {
+        console.warn('SessionService: No active session found, creating guest session');
+        // Automatically create a guest session as fallback
         try {
-          this.createGuestSession();
+          const guestSession = this.createGuestSession();
+          return {
+            isValid: true,
+            session: guestSession,
+            user: guestSession.user,
+            token: guestSession.token,
+            details: 'Guest session created as fallback',
+            isGuest: true
+          };
         } catch (guestError) {
-          console.warn('SessionService: Failed to create guest session:', guestError);
+          console.error('SessionService: Failed to create guest session:', guestError);
+          return {
+            isValid: false,
+            error: 'No active session',
+            requiresAuth: true,
+            details: 'Unable to create fallback session'
+          };
         }
-        
-        return {
-          isValid: false,
-          error: 'No active session',
-          requiresAuth: true,
-          details: 'Session object is null or invalid'
-        };
       }
 
       // Check session expiration with error handling
@@ -147,7 +154,7 @@ class SessionService {
    * Get current session with enhanced error handling
    * @returns {Object|null} Current session or null
    */
-  getCurrentSession() {
+getCurrentSession() {
     try {
       // Return current session if available
       if (this.currentSession && typeof this.currentSession === 'object') {
@@ -161,12 +168,26 @@ class SessionService {
         return storedSession;
       }
 
-      return null;
+      // Create guest session as fallback if no valid session exists
+      console.log('SessionService: No valid session found, creating guest session');
+      try {
+        return this.createGuestSession();
+      } catch (guestError) {
+        console.error('SessionService: Failed to create guest session in getCurrentSession:', guestError);
+        return null;
+      }
     } catch (error) {
       console.error('SessionService: Error in getCurrentSession:', error);
       // Clear potentially corrupted session
       this.currentSession = null;
-      return null;
+      
+      // Try to create fallback session
+      try {
+        return this.createGuestSession();
+      } catch (fallbackError) {
+        console.error('SessionService: All fallback methods failed:', fallbackError);
+        return null;
+      }
     }
   }
 
@@ -175,23 +196,38 @@ class SessionService {
    * @param {Object} session - Session to validate
    * @returns {boolean} True if valid
    */
-  validateSessionData(session) {
+validateSessionData(session) {
     try {
       if (!session || typeof session !== 'object') {
         return false;
       }
 
-      // Check required properties
-      if (!session.id || !session.createdAt) {
+      // Check required properties - be flexible with id field
+      if ((!session.id && !session.sessionId) || !session.createdAt) {
         return false;
       }
 
-      // Validate timestamps
-      if (typeof session.createdAt !== 'number' || session.createdAt <= 0) {
+      // Validate timestamps - handle both numeric and string formats for backward compatibility
+      let createdAt = session.createdAt;
+      if (typeof createdAt === 'string') {
+        createdAt = new Date(createdAt).getTime();
+      }
+      if (typeof createdAt !== 'number' || createdAt <= 0 || isNaN(createdAt)) {
         return false;
       }
 
-      if (session.expiresAt && (typeof session.expiresAt !== 'number' || session.expiresAt <= 0)) {
+      if (session.expiresAt) {
+        let expiresAt = session.expiresAt;
+        if (typeof expiresAt === 'string') {
+          expiresAt = new Date(expiresAt).getTime();
+        }
+        if (typeof expiresAt !== 'number' || expiresAt <= 0 || isNaN(expiresAt)) {
+          return false;
+        }
+      }
+
+      // Validate user object if present
+      if (session.user && typeof session.user !== 'object') {
         return false;
       }
 
@@ -207,7 +243,7 @@ class SessionService {
    * @param {Object} session - Session to check
    * @returns {boolean} True if expired
    */
-  isSessionExpired(session) {
+isSessionExpired(session) {
     try {
       if (!session || typeof session !== 'object') {
         return true;
@@ -218,7 +254,18 @@ class SessionService {
         return false;
       }
 
-      return Date.now() > session.expiresAt;
+      // Handle both string and numeric timestamp formats
+      let expiresAt = session.expiresAt;
+      if (typeof expiresAt === 'string') {
+        expiresAt = new Date(expiresAt).getTime();
+      }
+
+      if (typeof expiresAt !== 'number' || isNaN(expiresAt)) {
+        console.warn('SessionService: Invalid expiration timestamp format');
+        return true;
+      }
+
+      return Date.now() > expiresAt;
     } catch (error) {
       console.error('SessionService: Error checking session expiration:', error);
       // On error, consider session expired for security
@@ -261,13 +308,15 @@ class SessionService {
    * @param {string} token - Authentication token
    * @returns {Object} Created session
    */
-  createSession(userData, token = null) {
+createSession(userData, token = null) {
     try {
       if (!userData) {
         throw new Error('User data is required to create session');
       }
 
+      const now = Date.now();
       const session = {
+        id: this.generateSessionId(),
         user: {
           id: userData.id || null,
           username: userData.username || userData.email || 'user',
@@ -277,9 +326,9 @@ class SessionService {
           ...userData
         },
         token: token,
-        createdAt: new Date().toISOString(),
-        lastActivity: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
+        createdAt: now,
+        lastActivity: now,
+        expiresAt: now + this.sessionTimeout,
         sessionId: this.generateSessionId()
       };
 
@@ -291,6 +340,91 @@ class SessionService {
     } catch (error) {
       console.error('SessionService: Failed to create session:', error);
       throw new Error(`Session creation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a guest session as fallback
+   * @returns {Object} Guest session object
+   */
+  createGuestSession() {
+    try {
+      const now = Date.now();
+      const guestSession = {
+        id: this.generateSessionId(),
+        user: {
+          id: 'guest_' + now,
+          username: 'guest',
+          email: null,
+          role: 'guest',
+          name: 'Guest User'
+        },
+        token: null,
+        createdAt: now,
+        lastActivity: now,
+        expiresAt: now + this.sessionTimeout,
+        sessionId: this.generateSessionId(),
+        isGuest: true
+      };
+
+      this.currentSession = guestSession;
+      this.storeSession(guestSession);
+      this.notifyListeners('session_created', guestSession);
+
+      return guestSession;
+    } catch (error) {
+      console.error('SessionService: Failed to create guest session:', error);
+      // Return minimal session object as ultimate fallback
+      const fallbackSession = {
+        id: 'fallback_' + Date.now(),
+        user: { role: 'guest', name: 'Guest' },
+        token: null,
+        createdAt: Date.now(),
+        lastActivity: Date.now(),
+        expiresAt: Date.now() + this.sessionTimeout,
+        sessionId: 'fallback_session',
+        isGuest: true,
+        isFallback: true
+      };
+      this.currentSession = fallbackSession;
+      return fallbackSession;
+    }
+  }
+
+  /**
+   * Get stored session from localStorage with error handling
+   * @returns {Object|null} Stored session or null
+   */
+  getStoredSession() {
+    try {
+      const sessionData = localStorage.getItem(this.storageKey);
+      if (!sessionData) {
+        return null;
+      }
+
+      const session = JSON.parse(sessionData);
+      
+      // Convert legacy string timestamps to numbers for consistency
+      if (session.createdAt && typeof session.createdAt === 'string') {
+        session.createdAt = new Date(session.createdAt).getTime();
+      }
+      if (session.expiresAt && typeof session.expiresAt === 'string') {
+        session.expiresAt = new Date(session.expiresAt).getTime();
+      }
+      if (session.lastActivity && typeof session.lastActivity === 'string') {
+        session.lastActivity = new Date(session.lastActivity).getTime();
+      }
+
+      return session;
+    } catch (error) {
+      console.error('SessionService: Error reading stored session:', error);
+      // Clear corrupted storage
+      try {
+        localStorage.removeItem(this.storageKey);
+      } catch (clearError) {
+        console.error('SessionService: Failed to clear corrupted session:', clearError);
+      }
+      return null;
     }
   }
 
