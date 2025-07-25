@@ -8,7 +8,7 @@ import { PersistGate } from "redux-persist/integration/react";
 import { addRealTimeNotification, setConnectionStatus, updateApprovalStatus } from "@/store/approvalWorkflowSlice";
 import { persistor, store } from "@/store/index";
 import { shouldRetry } from "@/utils/errorHandling";
-import webSocketService from "@/services/api/websocketService";
+import webSocketService, { webSocketService } from "@/services/api/websocketService";
 import Category from "@/components/pages/Category";
 import AIGenerate from "@/components/pages/AIGenerate";
 import PaymentManagement from "@/components/pages/PaymentManagement";
@@ -268,9 +268,10 @@ const createLazyComponent = (importFn, componentName) => {
         )
       };
     }
-  };
+};
 
   return React.lazy(loadWithRetry);
+};
 
 // Lazy load heavy components for better performance with error handling
 const AdminDashboard = createLazyComponent(() => import('@/components/pages/AdminDashboard'), 'Admin Dashboard');
