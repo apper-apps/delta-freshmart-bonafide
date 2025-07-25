@@ -9,6 +9,7 @@ import { addRealTimeNotification, setConnectionStatus, updateApprovalStatus } fr
 import { persistor, store } from "@/store/index";
 import { shouldRetry } from "@/utils/errorHandling";
 import webSocketService from "@/services/api/websocketService";
+import sessionService from "@/services/SessionService";
 // Core components that need immediate loading (not lazy)
 import Cart from "@/components/pages/Cart";
 import Home from "@/components/pages/Home";
@@ -386,6 +387,52 @@ useEffect(() => {
 function App() {
   const [sdkReady, setSdkReady] = useState(false);
   const [sdkError, setSdkError] = useState(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState(null);
+
+  // Session initialization
+  useEffect(() => {
+    let mounted = true;
+    
+    const initializeSession = async () => {
+      try {
+        console.log('App: Initializing session service');
+        const session = await sessionService.getCurrentSession();
+        
+        if (mounted) {
+          if (session && sessionService.validateSessionData(session)) {
+            setSessionReady(true);
+            setSessionError(null);
+            console.log('App: Session initialized successfully', { 
+              sessionId: session.sessionId,
+              userRole: session.user?.role 
+            });
+          } else {
+            throw new Error('Invalid session returned from service');
+          }
+        }
+      } catch (error) {
+        console.error('App: Session initialization failed:', error);
+        
+        if (mounted) {
+          setSessionError(error.message);
+          // Don't block the app for session errors - allow guest access
+          setSessionReady(true);
+        }
+        
+        // Track session errors for monitoring
+        if (typeof window !== 'undefined' && window.performanceMonitor) {
+          window.performanceMonitor.trackError(error, 'session-initialization');
+        }
+      }
+    };
+    
+    initializeSession();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Optimized SDK status checking - memoized for performance
   const checkSDKStatus = useCallback(() => {
@@ -488,7 +535,26 @@ useEffect(() => {
 
     return () => clearTimeout(preloadTimer);
   }, []);
-return (
+// Show loading screen while session is initializing
+  if (!sessionReady) {
+    return (
+      <Provider store={store}>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <Loading type="page" />
+            <p className="mt-4 text-gray-600">Initializing session...</p>
+            {sessionError && (
+              <p className="mt-2 text-sm text-orange-600">
+                Session warning: {sessionError}
+              </p>
+            )}
+          </div>
+        </div>
+      </Provider>
+    );
+  }
+
+  return (
     <Provider store={store}>
       <PersistGate loading={<Loading type="page" />} persistor={persistor}>
         <WebSocketProvider>

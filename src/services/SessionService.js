@@ -155,7 +155,7 @@ constructor() {
   }
 
   // Enhanced getCurrentSession with automatic creation
-  async getCurrentSession() {
+async getCurrentSession() {
     try {
       // If we have a current session, validate and return it
       if (this.currentSession) {
@@ -164,6 +164,7 @@ constructor() {
         } else {
           console.log('SessionService: Current session invalid, clearing and recreating');
           this.currentSession = null;
+          this.clearStoredSession();
         }
       }
 
@@ -176,6 +177,7 @@ constructor() {
       // Try to get from storage
       const stored = this.getStoredSession();
       if (stored && this.validateSessionData(stored) && !this.isSessionExpired(stored)) {
+        console.log('SessionService: Valid session found in storage');
         this.currentSession = stored;
         return this.currentSession;
       }
@@ -183,17 +185,37 @@ constructor() {
       // No valid session exists, create guest session
       console.log('SessionService: No valid session found, creating guest session');
       const guestSession = await this.createGuestSession();
+      
+      // Validate the newly created session
+      if (!this.validateSessionData(guestSession)) {
+        throw new Error('Failed to create valid guest session');
+      }
+      
       this.currentSession = guestSession;
+      this.storeSession(guestSession);
+      this.notifyListeners('session_created', { session: guestSession });
+      
       return this.currentSession;
 
     } catch (error) {
       console.error('SessionService: Error getting current session:', error);
       
-      // Emergency fallback
+      // Emergency fallback - create minimal valid session
       if (!this.currentSession) {
-        console.log('SessionService: Creating emergency guest session');
-        const emergencyGuest = await this.createGuestSession();
-        this.currentSession = emergencyGuest;
+        console.log('SessionService: Creating emergency fallback session');
+        try {
+          const emergencyGuest = await this.createGuestSession();
+          if (this.validateSessionData(emergencyGuest)) {
+            this.currentSession = emergencyGuest;
+            this.storeSession(emergencyGuest);
+          } else {
+            // Last resort - create absolute minimal session
+            this.currentSession = this.createMinimalSession();
+          }
+        } catch (fallbackError) {
+          console.error('SessionService: Emergency session creation failed:', fallbackError);
+          this.currentSession = this.createMinimalSession();
+        }
       }
       
       return this.currentSession;
@@ -740,9 +762,89 @@ validateSessionData(session) {
   }
 
   /**
+/**
    * Create guest session for non-authenticated users
    * @returns {Object} Guest session
    */
+  async createGuestSession() {
+    try {
+      console.log('SessionService: Creating new guest session');
+      
+      const sessionId = this.generateSessionId();
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24 hours
+      
+      const guestSession = {
+        id: `guest_${sessionId}`,
+        sessionId: sessionId,
+        user: {
+          id: `guest_${Date.now()}`,
+          username: 'guest',
+          role: 'guest',
+          name: 'Guest User',
+          email: null,
+          isAuthenticated: false,
+          permissions: ['view_products', 'add_to_cart', 'checkout_guest']
+        },
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        isAuthenticated: false,
+        token: null,
+        refreshToken: null,
+        metadata: {
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+          createdBy: 'guest-session-service',
+          sessionType: 'guest'
+        }
+      };
+      
+      // Validate the session before returning
+      if (!this.validateSessionData(guestSession)) {
+        throw new Error('Created guest session failed validation');
+      }
+      
+      console.log('SessionService: Guest session created successfully', {
+        sessionId: guestSession.sessionId,
+        userId: guestSession.user.id,
+        expiresAt: guestSession.expiresAt
+      });
+      
+      return guestSession;
+      
+    } catch (error) {
+      console.error('SessionService: Error creating guest session:', error);
+      
+      // Fallback to minimal session if creation fails
+      return this.createMinimalSession();
+    }
+  }
+  
+  /**
+   * Create minimal session as last resort fallback
+   * @returns {Object} Minimal valid session
+   */
+  createMinimalSession() {
+    console.warn('SessionService: Creating minimal fallback session');
+    
+    const sessionId = `minimal_${Date.now()}`;
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + (60 * 60 * 1000)); // 1 hour
+    
+    return {
+      id: sessionId,
+      sessionId: sessionId,
+      user: {
+        id: `minimal_user_${Date.now()}`,
+        username: 'guest',
+        role: 'guest'
+      },
+      createdAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      isAuthenticated: false,
+      token: null
+    };
+  }
 /**
    * Create guest session for non-authenticated users
    * @returns {Object} Guest session
