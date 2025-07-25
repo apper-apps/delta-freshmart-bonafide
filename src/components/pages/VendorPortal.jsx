@@ -1,6 +1,6 @@
-import React, { useEffect, useState, Suspense, lazy } from 'react'
+import React, { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
-import formatCurrency from '@/utils/currency'
+import { formatCurrency } from '@/utils/currency'
 import ApperIcon from '@/components/ApperIcon'
 import Button from '@/components/atoms/Button'
 import Input from '@/components/atoms/Input'
@@ -9,12 +9,6 @@ import Loading from '@/components/ui/Loading'
 import { orderService } from '@/services/api/orderService'
 import { vendorService } from '@/services/api/vendorService'
 import { productService } from '@/services/api/productService'
-
-// Lazy load Orders component to prevent circular dependencies
-const LazyOrders = lazy(() => import('@/components/pages/Orders').catch(err => {
-  console.error('Failed to load Orders component:', err);
-  return { default: () => <Error message="Failed to load orders. Please refresh the page." /> };
-}));
 
 // Error boundary for lazy-loaded components
 class LazyComponentErrorBoundary extends React.Component {
