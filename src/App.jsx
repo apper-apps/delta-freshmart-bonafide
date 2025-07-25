@@ -390,23 +390,43 @@ function App() {
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionError, setSessionError] = useState(null);
 
-  // Session initialization
+// Enhanced session initialization with comprehensive error recovery
   useEffect(() => {
     let mounted = true;
+    let retryAttempts = 0;
+    const maxRetries = 3;
     
     const initializeSession = async () => {
       try {
-        console.log('App: Initializing session service');
-        const session = await sessionService.getCurrentSession();
+        console.log('App: Initializing session service (attempt', retryAttempts + 1, ')');
+        
+        // Add timeout to prevent hanging
+        const sessionPromise = sessionService.getCurrentSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session initialization timeout')), 10000)
+        );
+        
+        const session = await Promise.race([sessionPromise, timeoutPromise]);
         
         if (mounted) {
-          if (session && sessionService.validateSessionData(session)) {
-            setSessionReady(true);
-            setSessionError(null);
-            console.log('App: Session initialized successfully', { 
-              sessionId: session.sessionId,
-              userRole: session.user?.role 
-            });
+          if (session && typeof session === 'object' && session.user) {
+            // Enhanced validation
+            const isValid = sessionService.validateSessionData ? 
+              sessionService.validateSessionData(session) : 
+              !!(session.user && session.sessionId);
+              
+            if (isValid) {
+              setSessionReady(true);
+              setSessionError(null);
+              console.log('App: Session initialized successfully', { 
+                sessionId: session.sessionId,
+                userRole: session.user?.role,
+                isGuest: session.isGuest || session.user?.isGuest,
+                isMinimal: session.isMinimalSession
+              });
+            } else {
+              throw new Error('Session validation failed');
+            }
           } else {
             throw new Error('Invalid session returned from service');
           }
@@ -415,9 +435,25 @@ function App() {
         console.error('App: Session initialization failed:', error);
         
         if (mounted) {
-          setSessionError(error.message);
-          // Don't block the app for session errors - allow guest access
-          setSessionReady(true);
+          // Retry logic with exponential backoff
+          if (retryAttempts < maxRetries && error.message !== 'Session initialization timeout') {
+            retryAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, retryAttempts), 5000);
+            console.log(`App: Retrying session initialization in ${delay}ms (attempt ${retryAttempts}/${maxRetries})`);
+            
+            setTimeout(() => {
+              if (mounted) {
+                initializeSession();
+              }
+            }, delay);
+            return;
+          }
+          
+          // Final fallback - continue with error but don't block app
+          setSessionError(`Session initialization failed: ${error.message}`);
+          setSessionReady(true); // Allow app to continue
+          
+          console.warn('App: Continuing with session error - app will use fallback session');
         }
         
         // Track session errors for monitoring
