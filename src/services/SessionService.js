@@ -745,9 +745,26 @@ function createSessionService() {
     };
   }
 }
+// Singleton is already initialized above with proper error handling
+// DO NOT add duplicate initialization here - it causes constructor errors
+// The sessionService is initialized at lines 661-680 with try-catch and fallback
 
-// Initialize singleton
-sessionService = createSessionService();
+// Validate singleton before export
+if (!sessionService) {
+  console.error('SessionService failed to initialize - using minimal fallback');
+  sessionService = {
+    getCurrentSession: async () => null,
+    isAuthenticated: async () => false,
+    getCurrentUser: async () => null,
+    getToken: async () => null,
+    createSession: async () => null,
+    validateSession: async () => false,
+    clearSession: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    getSessionInfo: async () => ({ user: null, permissions: [] })
+  };
+}
 
 // Export singleton instance as default and class for flexibility
 export default sessionService;
