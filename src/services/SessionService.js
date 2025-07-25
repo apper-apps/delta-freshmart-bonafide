@@ -37,52 +37,70 @@ class SessionService {
    * Validate current session - main method that was throwing the error
    * @returns {Object} Session validation result
    */
-  validateSession() {
+validateSession() {
     try {
       const session = this.getCurrentSession();
       
-      if (!session) {
+      if (!session || typeof session !== 'object') {
+        console.warn('SessionService: No active session found');
         return {
           isValid: false,
           error: 'No active session',
-          requiresAuth: true
+          requiresAuth: true,
+          details: 'Session object is null or invalid'
         };
       }
 
       // Check session expiration
       if (this.isSessionExpired(session)) {
+        console.warn('SessionService: Session has expired');
         this.clearSession();
         return {
           isValid: false,
           error: 'Session expired',
-          requiresAuth: true
+          requiresAuth: true,
+          details: 'Session timestamp indicates expiration'
         };
       }
 
       // Validate session data integrity
       if (!this.validateSessionData(session)) {
+        console.warn('SessionService: Session data validation failed');
         this.clearSession();
         return {
           isValid: false,
           error: 'Invalid session data',
-          requiresAuth: true
+          requiresAuth: true,
+          details: 'Session data structure or content is invalid'
         };
       }
 
       // Refresh session timestamp
-      this.refreshSession(session);
+      try {
+        this.refreshSession(session);
+      } catch (refreshError) {
+        console.warn('SessionService: Failed to refresh session:', refreshError);
+        // Continue with validation even if refresh fails
+      }
 
       return {
         isValid: true,
         session: session,
-        user: session.user || null
+        user: session.user || null,
+        details: 'Session validation successful'
       };
     } catch (error) {
       console.error('SessionService: Session validation failed:', error);
+      
+      // Ensure error is always a string, never an Error object
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
       return {
         isValid: false,
-        error: error.message || 'Session validation error',
-        requiresAuth: true
+        error: errorMessage || 'Session validation error',
+        requiresAuth: true,
+        details: `Validation exception: ${errorMessage}`,
+        stack: error instanceof Error ? error.stack : undefined
       };
     }
   }
@@ -242,11 +260,32 @@ class SessionService {
    * @returns {boolean} Authentication status
    */
   isAuthenticated() {
-    try {
+try {
       const validation = this.validateSession();
-      return validation.isValid;
+      
+      // Handle validation response properly
+      if (!validation || typeof validation !== 'object') {
+        console.error('SessionService: Invalid validation response:', validation);
+        return false;
+      }
+      
+      // Log validation details for debugging
+      if (!validation.isValid) {
+        console.debug('SessionService: Authentication failed -', validation.error, validation.details);
+      }
+      
+      return Boolean(validation.isValid);
     } catch (error) {
       console.error('SessionService: Authentication check failed:', error);
+      
+      // Additional error context for debugging
+      console.error('SessionService: Error details:', {
+        message: error.message,
+        stack: error.stack,
+        type: typeof error,
+        timestamp: new Date().toISOString()
+      });
+      
       return false;
     }
   }
