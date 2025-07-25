@@ -682,5 +682,10 @@ try {
   };
 }
 
+// Export both the class and instance
 export { SessionService };
+
+// Create and export service instance
+const sessionService = new SessionService();
+export default sessionService;
 export default sessionService;
