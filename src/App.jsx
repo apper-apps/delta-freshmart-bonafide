@@ -431,12 +431,15 @@ function App() {
             throw new Error('Invalid session returned from service');
           }
         }
-      } catch (error) {
+} catch (error) {
         console.error('App: Session initialization failed:', error);
         
         if (mounted) {
-          // Retry logic with exponential backoff
-          if (retryAttempts < maxRetries && error.message !== 'Session initialization timeout') {
+          // Enhanced retry logic with better error categorization
+          const isRetryable = error.message !== 'Session initialization timeout' && 
+                             !error.message.includes('Session validation failed');
+          
+          if (retryAttempts < maxRetries && isRetryable) {
             retryAttempts++;
             const delay = Math.min(1000 * Math.pow(2, retryAttempts), 5000);
             console.log(`App: Retrying session initialization in ${delay}ms (attempt ${retryAttempts}/${maxRetries})`);
@@ -449,11 +452,26 @@ function App() {
             return;
           }
           
-          // Final fallback - continue with error but don't block app
-          setSessionError(`Session initialization failed: ${error.message}`);
-          setSessionReady(true); // Allow app to continue
-          
-          console.warn('App: Continuing with session error - app will use fallback session');
+          // Enhanced fallback with guest session creation
+          console.warn('App: Creating fallback session after initialization failure');
+          try {
+            // Attempt to create a guest session as fallback
+            const fallbackSession = await sessionService.createGuestSession();
+            if (fallbackSession) {
+              setSessionReady(true);
+              setSessionError(null);
+              console.log('App: Fallback guest session created successfully');
+            } else {
+              throw new Error('Failed to create fallback session');
+            }
+          } catch (fallbackError) {
+            console.error('App: Fallback session creation failed:', fallbackError);
+            // Final fallback - continue with error but don't block app
+            setSessionError(`Session initialization failed: ${error.message}. App will continue with limited functionality.`);
+            setSessionReady(true); // Allow app to continue
+            
+            console.warn('App: Continuing without session - some features may be limited');
+          }
         }
         
         // Track session errors for monitoring

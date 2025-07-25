@@ -11,7 +11,7 @@ class SessionService {
       session: 'user_session',
       user: 'current_user',
       token: 'auth_token'
-};
+    };
     
     // Initialize on first access instead of constructor
     this._initialized = false;
@@ -40,7 +40,7 @@ class SessionService {
   /**
    * Initialize session from storage or create new one
    */
-async initializeSession() {
+  async initializeSession() {
     if (this.isInitializing) return this.currentSession;
     
     this.isInitializing = true;
@@ -80,30 +80,6 @@ async initializeSession() {
     } finally {
       this.isInitializing = false;
     }
-  }
-
-  // Add method to get current session with lazy initialization
-  async getCurrentSession() {
-    await this._ensureInitialized();
-    return this.currentSession;
-  }
-
-  // Add method to check authentication with lazy initialization
-  async isAuthenticated() {
-    await this._ensureInitialized();
-    return this.currentSession && this.currentSession.user && this.currentSession.user.id !== null;
-  }
-
-  // Add method to get current user with lazy initialization
-  async getCurrentUser() {
-    await this._ensureInitialized();
-    return this.currentSession ? this.currentSession.user : null;
-  }
-
-  // Add method to get token with lazy initialization
-  async getToken() {
-    await this._ensureInitialized();
-    return this.currentSession ? this.currentSession.token : null;
   }
 
   /**
@@ -666,15 +642,15 @@ async initializeSession() {
    * @param {Object} session - Session to validate
    * @returns {Promise<boolean>} True if valid
    */
-  async validateSession(session = null) {
+async validateSession(session = null) {
     try {
-const sessionToValidate = session || this.currentSession;
+      const sessionToValidate = session || this.currentSession;
       if (!sessionToValidate) {
         return false;
       }
       
       return this.validateSessionData(sessionToValidate) && !this.isSessionExpired(sessionToValidate);
-} catch (error) {
+    } catch (error) {
       console.error('SessionService: Error validating session:', error);
       return false;
     }
