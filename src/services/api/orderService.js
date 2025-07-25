@@ -397,12 +397,12 @@ async updateVerificationStatus(orderId, status, notes = '') {
       updatedOrder.paymentVerifiedAt = new Date().toISOString();
       updatedOrder.approvalStatus = 'approved'; // Update approval status
       
-      // Immediately update to confirmed status
+// Immediately update to confirmed status
       setTimeout(async () => {
         try {
-          await this.updateOrderStatus(orderId, 'confirmed');
+          await this.update(orderId, { status: 'confirmed' });
         } catch (error) {
-          console.error('Failed to update order to confirmed:', error);
+          console.error(`Failed to update order ${orderId} to confirmed:`, error);
         }
       }, 100);
     } else {
