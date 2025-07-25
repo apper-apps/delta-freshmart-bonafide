@@ -281,48 +281,6 @@ validateSessionData(session) {
     }
   }
 
-  isSessionExpired(session) {
-    try {
-      // Enhanced session existence check
-      if (!session || typeof session !== 'object' || session === null) {
-        console.log('SessionService: Cannot check expiration - session is null or invalid');
-        return true;
-      }
-
-      if (!session.expiresAt) {
-        console.log('SessionService: Cannot check expiration - no expiresAt field');
-        return true;
-      }
-
-      // Validate expiresAt format
-      const expirationTime = new Date(session.expiresAt).getTime();
-      if (isNaN(expirationTime)) {
-        console.warn('SessionService: Invalid expiresAt format:', session.expiresAt);
-        return true;
-      }
-
-      const currentTime = Date.now();
-      const isExpired = currentTime >= expirationTime;
-
-      if (isExpired) {
-        console.log('SessionService: Session expired', {
-          expiresAt: session.expiresAt,
-          currentTime: new Date(currentTime).toISOString(),
-          timeUntilExpiry: expirationTime - currentTime
-        });
-      } else {
-        console.log('SessionService: Session is valid', {
-          expiresAt: session.expiresAt,
-          timeUntilExpiry: expirationTime - currentTime
-        });
-      }
-
-      return isExpired;
-    } catch (error) {
-      console.error('SessionService: Error checking session expiration:', error);
-      return true; // Assume expired on error
-    }
-  }
 
 // Enhanced getStoredSession with better error handling
 /**
@@ -476,7 +434,7 @@ validateSessionData(session) {
    * Get current session with enhanced error handling
    * @returns {Object|null} Current session or null
    */
-  async getCurrentSession() {
+async getCurrentSession() {
     try {
       console.log('SessionService: Getting current session...');
       
@@ -519,14 +477,16 @@ validateSessionData(session) {
         const guestSession = await this.createGuestSession();
         if (guestSession && typeof guestSession === 'object') {
           console.log('SessionService: Guest session created successfully');
+          this.currentSession = guestSession;
+          this.storeSession(guestSession);
           return guestSession;
         } else {
           console.error('SessionService: Guest session creation returned invalid result');
-          return null;
+          throw new Error('Guest session creation failed');
         }
       } catch (guestError) {
         console.error('SessionService: Failed to create guest session in getCurrentSession:', guestError);
-        return null;
+        throw new Error('Guest session creation failed: ' + guestError.message);
       }
     } catch (error) {
       console.error('SessionService: Critical error in getCurrentSession:', error);
@@ -540,37 +500,24 @@ validateSessionData(session) {
         console.error('SessionService: Failed to clear corrupted session:', clearError);
       }
       
-      // Final attempt to create fallback session
-      try {
-        console.log('SessionService: Making final attempt to create fallback session...');
-        const fallbackSession = await this.createGuestSession();
-        if (fallbackSession && typeof fallbackSession === 'object') {
-          console.log('SessionService: Fallback session created successfully');
-          return fallbackSession;
-        } else {
-          console.error('SessionService: Fallback session creation failed');
-          return null;
-        }
-      } catch (fallbackError) {
-        console.error('SessionService: All session recovery methods failed:', fallbackError);
-        
-        // Return minimal session object to prevent application crashes
-        const emergencySession = {
-          id: 'emergency-' + Date.now(),
-          sessionId: 'emergency-session',
-          user: {
-            id: 'guest',
-            username: 'Guest User',
-            role: 'guest'
-          },
-          createdAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-          isEmergencySession: true
-        };
-        
-        console.warn('SessionService: Created emergency session to prevent app crash');
-        return emergencySession;
-      }
+      // Create emergency session to prevent application crashes
+      const emergencySession = {
+        id: 'emergency-' + Date.now(),
+        sessionId: 'emergency-session',
+        user: {
+          id: 'guest',
+          username: 'Guest User',
+          role: 'guest'
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+        isAuthenticated: false,
+        isEmergencySession: true
+      };
+      
+      console.warn('SessionService: Created emergency session to prevent app crash');
+      this.currentSession = emergencySession;
+      return emergencySession;
     }
   }
 /**
@@ -700,9 +647,12 @@ validateSessionData(session) {
    */
   getSessionInfo() {
     try {
-      const session = this.getCurrentSession();
+const session = await this.getCurrentSession();
       if (!session) {
-        return { status: 'No active session' };
+        return { 
+          status: 'No active session',
+          error: 'Failed to retrieve or create session'
+        };
       }
 
       return {
@@ -712,7 +662,8 @@ validateSessionData(session) {
         createdAt: session.createdAt,
         lastActivity: session.lastActivity,
         expiresAt: session.expiresAt,
-        isExpired: this.isSessionExpired(session)
+        isExpired: this.isSessionExpired(session),
+        isEmergencySession: session.isEmergencySession || false
       };
     } catch (error) {
       console.error('SessionService: Failed to get session info:', error);
@@ -760,7 +711,8 @@ validateSessionData(session) {
       
       // Validate the session before returning
       if (!this.validateSessionData(guestSession)) {
-        throw new Error('Created guest session failed validation');
+        console.error('SessionService: Created guest session failed validation');
+        throw new Error('Guest session validation failed');
       }
       
       console.log('SessionService: Guest session created successfully', {
@@ -769,13 +721,14 @@ validateSessionData(session) {
         expiresAt: guestSession.expiresAt
       });
       
+      // Store the session immediately after creation
+      this.storeSession(guestSession);
+      
       return guestSession;
       
     } catch (error) {
       console.error('SessionService: Error creating guest session:', error);
-      
-      // Fallback to minimal session if creation fails
-      return this.createMinimalSession();
+      throw new Error('Failed to create guest session: ' + error.message);
     }
   }
   
