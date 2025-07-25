@@ -9,27 +9,11 @@ import { addRealTimeNotification, setConnectionStatus, updateApprovalStatus } fr
 import { persistor, store } from "@/store/index";
 import { shouldRetry } from "@/utils/errorHandling";
 import webSocketService from "@/services/api/websocketService";
-import Category from "@/components/pages/Category";
-import AIGenerate from "@/components/pages/AIGenerate";
-import PaymentManagement from "@/components/pages/PaymentManagement";
-import OrderSummary from "@/components/pages/OrderSummary";
-import PayrollManagement from "@/components/pages/PayrollManagement";
-import FinancialDashboard from "@/components/pages/FinancialDashboard";
-import ProductManagement from "@/components/pages/ProductManagement";
-import Analytics from "@/components/pages/Analytics";
-import VendorManagement from "@/components/pages/VendorManagement";
-import VendorPortal from "@/components/pages/VendorPortal";
-import { RoleAssignment } from "@/components/pages/RoleAssignment";
-import POS from "@/components/pages/POS";
+// Core components that need immediate loading (not lazy)
 import Cart from "@/components/pages/Cart";
 import Home from "@/components/pages/Home";
 import ProductDetail from "@/components/pages/ProductDetail";
-import Orders from "@/components/pages/Orders";
 import Checkout from "@/components/pages/Checkout";
-import Account from "@/components/pages/Account";
-import DeliveryTracking from "@/components/pages/DeliveryTracking";
-import AdminDashboard from "@/components/pages/AdminDashboard";
-import OrderTracking from "@/components/pages/OrderTracking";
 import Layout from "@/components/organisms/Layout";
 import Error from "@/components/ui/Error";
 import Loading from "@/components/ui/Loading";
@@ -290,7 +274,7 @@ const OrderSummary = createLazyComponent(() => import('@/components/pages/OrderS
 const OrderTracking = createLazyComponent(() => import('@/components/pages/OrderTracking'), 'Order Tracking');
 const Account = createLazyComponent(() => import('@/components/pages/Account'), 'Account');
 const VendorPortal = createLazyComponent(() => import('@/components/pages/VendorPortal'), 'Vendor Portal');
-const RoleAssignment = createLazyComponent(() => import('@/components/pages/RoleAssignment'), 'Role Assignment');
+const RoleAssignment = createLazyComponent(() => import('@/components/pages/RoleAssignment').then(module => ({ default: module.RoleAssignment })), 'Role Assignment');
 // WebSocket Integration Component
 const WebSocketProvider = ({ children }) => {
   const dispatch = useDispatch();
