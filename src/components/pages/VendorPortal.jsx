@@ -1,16 +1,43 @@
-import React, { useEffect, useState } from "react";
-import { toast } from "react-toastify";
-import formatCurrency from "@/utils/currency";
-import ApperIcon from "@/components/ApperIcon";
-import Button from "@/components/atoms/Button";
-import Input from "@/components/atoms/Input";
-import Error from "@/components/ui/Error";
-import Loading from "@/components/ui/Loading";
-import Orders from "@/components/pages/Orders";
-import Category from "@/components/pages/Category";
-import { orderService } from "@/services/api/orderService";
-import { vendorService } from "@/services/api/vendorService";
-import { productService } from "@/services/api/productService";
+import React, { useEffect, useState, Suspense, lazy } from 'react'
+import { toast } from 'react-toastify'
+import formatCurrency from '@/utils/currency'
+import ApperIcon from '@/components/ApperIcon'
+import Button from '@/components/atoms/Button'
+import Input from '@/components/atoms/Input'
+import Error from '@/components/ui/Error'
+import Loading from '@/components/ui/Loading'
+import { orderService } from '@/services/api/orderService'
+import { vendorService } from '@/services/api/vendorService'
+import { productService } from '@/services/api/productService'
+
+// Lazy load Orders component to prevent circular dependencies
+const LazyOrders = lazy(() => import('@/components/pages/Orders').catch(err => {
+  console.error('Failed to load Orders component:', err);
+  return { default: () => <Error message="Failed to load orders. Please refresh the page." /> };
+}));
+
+// Error boundary for lazy-loaded components
+class LazyComponentErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Lazy component error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <Error message="Component failed to load. Please refresh the page." />;
+    }
+    return this.props.children;
+  }
+}
 
 const VendorPortal = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
