@@ -2,7 +2,6 @@
  * SessionService - Comprehensive session management for the application
  * Handles user authentication, session persistence, and state management
  */
-
 class SessionService {
   constructor() {
     this.currentSession = null;
@@ -630,11 +629,11 @@ class SessionService {
     } catch (error) {
       console.error('SessionService: Error validating session:', error);
       return false;
-    }
+}
   }
 }
 
-// Create singleton instance
+// Create service instance
 const sessionService = new SessionService();
 
 // Export individual methods for convenience
