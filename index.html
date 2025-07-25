@@ -38,58 +38,10 @@
           }
         }
       };
-    </script>
-  </head>
-  <body>
-        }
-      });
-
-      // PostMessage error wrapper for external integrations
-      const originalPostMessage = window.postMessage;
-      window.postMessage = function(message, targetOrigin, transfer) {
-        try {
-          // Convert URL objects to strings to prevent DataCloneError
-          const sanitizedMessage = sanitizeMessageForPostMessage(message);
-          return originalPostMessage.call(this, sanitizedMessage, targetOrigin, transfer);
-        } catch (error) {
-          console.warn('PostMessage error prevented:', error);
-          // Attempt to send string representation if original fails
-          try {
-            const stringMessage = typeof message === 'object' ? JSON.stringify(message) : String(message);
-            return originalPostMessage.call(this, stringMessage, targetOrigin, transfer);
-          } catch (fallbackError) {
-            console.error('PostMessage fallback also failed:', fallbackError);
-          }
-        }
-      };
-
-      function sanitizeMessageForPostMessage(obj) {
-        if (obj === null || typeof obj !== 'object') {
-          return obj;
-        }
-        
-        if (obj instanceof URL) {
-          return obj.toString();
-        }
-        
-        if (Array.isArray(obj)) {
-          return obj.map(sanitizeMessageForPostMessage);
-        }
-        
-        const sanitized = {};
-        for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
-            sanitized[key] = sanitizeMessageForPostMessage(obj[key]);
-          }
-        }
-        return sanitized;
-      }
-    </script>
+</script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-  </body>
-</html>
   </body>
 </html>
