@@ -1,6 +1,4 @@
-import React from "react";
 import productsData from "@/services/mockData/products.json";
-import Error from "@/components/ui/Error";
 class ProductService {
   constructor() {
     this.products = [...productsData];
@@ -1015,7 +1013,6 @@ const mockUnsplashImages = Array.from({ length: loadMore ? 12 : 6 }, (_, index) 
       'snacks': ['crunchy', 'satisfying', 'portable', 'tasty', 'convenient', 'wholesome', 'guilt-free'],
       
       // Legacy support
-      'Fresh Vegetables': ['organic', 'healthy', 'green', 'fresh', 'natural'],
 'Fresh Vegetables': ['organic', 'healthy', 'green', 'fresh', 'natural'],
       'Tropical Fruits': ['colorful', 'exotic', 'sweet', 'vitamin', 'tropical'],
       'Dairy Products': ['creamy', 'calcium', 'protein', 'fresh', 'natural'],
@@ -1065,8 +1062,8 @@ const mockUnsplashImages = Array.from({ length: loadMore ? 12 : 6 }, (_, index) 
       const styleParams = this.getStyleParameters(style);
       
       // Simulate AI generation result
-      const generatedImage = {
-url: `https://via.placeholder.com/600x600/2196F3/ffffff?text=AI+Generated+${encodeURIComponent(prompt.substring(0, 10))}`,
+const generatedImage = {
+        url: `https://via.placeholder.com/600x600/2196F3/ffffff?text=AI+Generated+${encodeURIComponent(prompt.substring(0, 10))}`,
         thumbnail: `https://via.placeholder.com/200x200/2196F3/ffffff?text=AI+Gen`,
         prompt: enhancedPrompt,
         originalPrompt: prompt,
@@ -1191,129 +1188,14 @@ url: `https://via.placeholder.com/600x600/2196F3/ffffff?text=AI+Generated+${enco
       const category = productData.category;
 
       // Enhanced price validation with specific error messages
-      if (basePrice <= 0) {
+if (basePrice <= 0) {
         conflicts.push({
           type: 'invalid_base_price',
           details: 'Base price must be greater than 0',
           field: 'basePrice',
           currentValue: basePrice
-});
+        });
       }
-
-      // Validate variation price hierarchy with enhanced checks
-  // Validate offer conflicts with existing pricing and discounts
-  async validateOfferConflicts(productData, offerData = null) {
-    try {
-      await this.delay(150);
-      
-      const conflicts = [];
-      const productId = productData.id;
-      const currentPrice = parseFloat(productData.price) || 0;
-      
-      // Get all products to check for conflicts
-      const allProducts = this.products || [];
-      const currentProduct = allProducts.find(p => p.id === productId);
-      
-      // If offer data is provided, validate it
-      if (offerData) {
-        // Check for overlapping seasonal discounts
-        if (currentProduct?.seasonalDiscounts?.length > 0) {
-          const offerStart = new Date(offerData.startDate);
-          const offerEnd = new Date(offerData.endDate);
-          
-          for (const discount of currentProduct.seasonalDiscounts) {
-            const discountStart = new Date(discount.startDate);
-            const discountEnd = new Date(discount.endDate);
-            
-            // Check for date overlap
-            if (offerStart <= discountEnd && offerEnd >= discountStart) {
-              conflicts.push({
-                type: 'seasonal_discount_overlap',
-                message: `Offer period overlaps with existing seasonal discount (${discount.name})`,
-                conflictData: discount,
-                severity: 'high'
-              });
-            }
-          }
-        }
-        
-        // Check minimum pricing rules
-        const minPrice = currentPrice * 0.3; // 30% minimum
-        if (parseFloat(offerData.discountedPrice) < minPrice) {
-          conflicts.push({
-            type: 'minimum_price_violation',
-            message: `Offer price (${offerData.discountedPrice}) below minimum allowed (${minPrice.toFixed(2)})`,
-            conflictData: { minPrice, offerPrice: offerData.discountedPrice },
-            severity: 'critical'
-          });
-        }
-        
-        // Check vendor pricing agreements
-        if (currentProduct?.vendorAssignments?.length > 0) {
-          for (const assignment of currentProduct.vendorAssignments) {
-            if (assignment.minimumPrice && parseFloat(offerData.discountedPrice) < assignment.minimumPrice) {
-              conflicts.push({
-                type: 'vendor_agreement_violation',
-                message: `Offer violates vendor minimum price agreement`,
-                conflictData: assignment,
-                severity: 'high'
-              });
-            }
-          }
-        }
-      }
-      
-      // Check for pricing hierarchy conflicts
-      if (productData.category) {
-        const categoryProducts = allProducts.filter(p => 
-          p.category === productData.category && p.id !== productId
-        );
-        
-        for (const product of categoryProducts) {
-          if (product.tier && productData.tier) {
-            const tierDiff = parseInt(product.tier) - parseInt(productData.tier);
-            const priceDiff = parseFloat(product.price) - currentPrice;
-            
-            // Check if pricing doesn't match tier hierarchy
-            if ((tierDiff > 0 && priceDiff < 0) || (tierDiff < 0 && priceDiff > 0)) {
-              conflicts.push({
-                type: 'tier_pricing_conflict',
-                message: `Price doesn't align with product tier hierarchy`,
-                conflictData: { conflictProduct: product, tierDiff, priceDiff },
-                severity: 'medium'
-              });
-            }
-          }
-        }
-      }
-      
-      return {
-        isValid: conflicts.length === 0,
-        conflicts,
-        summary: {
-          total: conflicts.length,
-          critical: conflicts.filter(c => c.severity === 'critical').length,
-          high: conflicts.filter(c => c.severity === 'high').length,
-          medium: conflicts.filter(c => c.severity === 'medium').length
-        }
-      };
-      
-    } catch (error) {
-      console.error('Error validating offer conflicts:', error);
-      return {
-        isValid: false,
-        conflicts: [{
-          type: 'validation_error',
-          message: 'Failed to validate offer conflicts',
-          conflictData: error,
-          severity: 'critical'
-        }],
-        summary: { total: 1, critical: 1, high: 0, medium: 0 }
-      };
-    }
-  }
-// Enhanced seasonal discount validation
-
       // Validate variation price hierarchy with enhanced checks
       if (variationPrice > 0) {
         if (variationPrice < basePrice * 0.8) {
@@ -1548,974 +1430,141 @@ url: `https://via.placeholder.com/600x600/2196F3/ffffff?text=AI+Generated+${enco
     }
   }
 
-  // Calculate final price based on hierarchy: Base Price > Variation Override > Seasonal Discount
-  calculateHierarchyPrice(productData) {
-    if (!productData) return 0;
-
-    // Step 1: Start with base price
-    let effectivePrice = parseFloat(productData.basePrice || productData.price) || 0;
-
-    // Step 2: Apply variation override if exists (higher precedence than base)
-    if (productData.variationPrice && parseFloat(productData.variationPrice) > 0) {
-      effectivePrice = parseFloat(productData.variationPrice);
-    }
-
-    // Step 3: Apply seasonal discount (highest precedence)
-    if (productData.seasonalDiscount && parseFloat(productData.seasonalDiscount) > 0) {
-      if (productData.seasonalDiscountType === 'Percentage') {
-        effectivePrice = effectivePrice * (1 - parseFloat(productData.seasonalDiscount) / 100);
-      } else {
-        effectivePrice = Math.max(0, effectivePrice - parseFloat(productData.seasonalDiscount));
-      }
-    }
-
-    return Math.round(effectivePrice * 100) / 100;
-  }
-
-  // Add variation pricing to product
-  async addVariationPricing(productId, variations) {
-    await this.delay(300);
-    
-    const productIndex = this.products.findIndex(p => p.id === parseInt(productId));
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-
-    // Validate variations
-    for (const variation of variations) {
-      if (!variation.name || !variation.price || variation.price <= 0) {
-        throw new Error('Each variation must have a valid name and price');
-      }
-    }
-
-    this.products[productIndex] = {
-      ...this.products[productIndex],
-      variations: variations,
-      hasVariations: true,
-      variationPrice: variations.find(v => v.default)?.price || variations[0]?.price
-    };
-
-    return { ...this.products[productIndex] };
-  }
-
-  // Add seasonal discount to product
-  async addSeasonalDiscount(productId, discountData) {
-    await this.delay(300);
-    
-    const productIndex = this.products.findIndex(p => p.id === parseInt(productId));
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-
-    // Validate seasonal discount
-    const validation = await this.validatePricingHierarchy({
-      ...this.products[productIndex],
-      ...discountData
-    }, this.products, productId);
-
-    if (!validation.isValid) {
-      throw new Error(validation.error || 'Invalid seasonal discount configuration');
-    }
-
-    this.products[productIndex] = {
-      ...this.products[productIndex],
-      seasonalDiscount: parseFloat(discountData.seasonalDiscount) || 0,
-      seasonalDiscountType: discountData.seasonalDiscountType || 'Fixed Amount',
-      seasonalDiscountActive: discountData.seasonalDiscountActive || false,
-      seasonalDiscountStartDate: discountData.seasonalDiscountStartDate,
-      seasonalDiscountEndDate: discountData.seasonalDiscountEndDate
-    };
-
-    return { ...this.products[productIndex] };
-  }
-
-// Enhanced bulk update with pricing hierarchy support
-  async bulkUpdatePricingHierarchy(updateData) {
-    await this.delay(500);
-    
-    const validation = this.validateBulkPriceUpdate(updateData);
-    if (!validation.isValid) {
-      throw new Error(validation.error);
-    }
-
-    let filteredProducts = [...this.products];
-    
-    // Filter by category
-    if (updateData.category !== 'all') {
-      filteredProducts = filteredProducts.filter(p => p.category === updateData.category);
-    }
-    
-    // Filter by stock if enabled
-    if (updateData.applyToLowStock) {
-      filteredProducts = filteredProducts.filter(p => p.stock <= updateData.stockThreshold);
-    }
-
-    let updatedCount = 0;
-    const conflictProducts = [];
-    const hierarchyUpdates = [];
-    
-    // Process each product with hierarchy awareness
-    for (const product of filteredProducts) {
-      let shouldUpdate = true;
-      const updates = { ...product };
+  // Enhanced offer conflicts validation method - bound to class instance
+  async validateOfferConflicts(productData, offerData = null) {
+    try {
+      await this.delay(150);
       
-      // Handle base price updates
-      if (updateData.updateType === 'base_price') {
-        const originalPrice = product.basePrice || product.price;
-        let newPrice = originalPrice;
-        
-        switch (updateData.strategy) {
-          case 'percentage':
-            const percentage = parseFloat(updateData.value) || 0;
-            newPrice = originalPrice * (1 + percentage / 100);
-            break;
-          case 'fixed':
-            const fixedAmount = parseFloat(updateData.value) || 0;
-            newPrice = originalPrice + fixedAmount;
-            break;
-        }
-        
-        updates.basePrice = Math.round(newPrice * 100) / 100;
-        updates.price = updates.basePrice; // Sync legacy price field
+      const conflicts = [];
+      const productId = productData?.id;
+      const currentPrice = parseFloat(productData?.price) || 0;
+      
+      // Validate input parameters
+      if (!productData || typeof productData !== 'object') {
+        return {
+          isValid: false,
+          conflicts: [{
+            type: 'invalid_input',
+            message: 'Invalid product data provided',
+            conflictData: null,
+            severity: 'critical'
+          }],
+          summary: { total: 1, critical: 1, high: 0, medium: 0 }
+        };
       }
       
-      // Handle variation price updates
-      if (updateData.updateType === 'variation_price' && updateData.variationPrice) {
-        updates.variationPrice = parseFloat(updateData.variationPrice);
-      }
+      // Get all products to check for conflicts
+      const allProducts = this.products || [];
+      const currentProduct = allProducts.find(p => p?.id === productId);
       
-      // Handle seasonal discount updates
-      if (updateData.updateType === 'seasonal_discount') {
-        if (product.seasonalDiscount > 0) {
-          switch (updateData.conflictResolution) {
-            case 'skip':
-              shouldUpdate = false;
-              conflictProducts.push(product);
-              break;
-            case 'override':
-              updates.seasonalDiscount = parseFloat(updateData.seasonalDiscount) || 0;
-              updates.seasonalDiscountType = updateData.seasonalDiscountType || 'Fixed Amount';
-              updates.seasonalDiscountActive = updateData.seasonalDiscountActive || false;
-              break;
-            case 'merge':
-              // Keep higher discount
-              const existingDiscount = product.seasonalDiscount || 0;
-              const newDiscount = parseFloat(updateData.seasonalDiscount) || 0;
-              if (newDiscount > existingDiscount) {
-                updates.seasonalDiscount = newDiscount;
-                updates.seasonalDiscountType = updateData.seasonalDiscountType;
-                updates.seasonalDiscountActive = updateData.seasonalDiscountActive;
-              } else {
-                shouldUpdate = false;
+      // If offer data is provided, validate it
+      if (offerData && typeof offerData === 'object') {
+        // Check for overlapping seasonal discounts
+        if (currentProduct?.seasonalDiscounts?.length > 0) {
+          const offerStart = new Date(offerData.startDate);
+          const offerEnd = new Date(offerData.endDate);
+          
+          // Validate dates
+          if (isNaN(offerStart.getTime()) || isNaN(offerEnd.getTime())) {
+            conflicts.push({
+              type: 'invalid_offer_dates',
+              message: 'Invalid offer start or end date',
+              conflictData: { startDate: offerData.startDate, endDate: offerData.endDate },
+              severity: 'high'
+            });
+          } else {
+            for (const discount of currentProduct.seasonalDiscounts) {
+              const discountStart = new Date(discount.startDate);
+              const discountEnd = new Date(discount.endDate);
+              
+              // Check for date overlap
+              if (offerStart <= discountEnd && offerEnd >= discountStart) {
+                conflicts.push({
+                  type: 'seasonal_discount_overlap',
+                  message: `Offer period overlaps with existing seasonal discount (${discount.name})`,
+                  conflictData: discount,
+                  severity: 'high'
+                });
               }
-              break;
+            }
           }
-        } else {
-          updates.seasonalDiscount = parseFloat(updateData.seasonalDiscount) || 0;
-          updates.seasonalDiscountType = updateData.seasonalDiscountType || 'Fixed Amount';
-          updates.seasonalDiscountActive = updateData.seasonalDiscountActive || false;
         }
-      }
-
-      // Validate hierarchy before applying
-      if (shouldUpdate) {
-        const hierarchyValidation = await this.validatePricingHierarchy(updates, this.products, product.id);
-        if (!hierarchyValidation.isValid) {
-          conflictProducts.push({
-            ...product,
-            hierarchyError: hierarchyValidation.error,
-            conflicts: hierarchyValidation.conflicts
-          });
-          shouldUpdate = false;
-        }
-      }
-
-      // Apply updates if valid
-      if (shouldUpdate) {
-        const productIndex = this.products.findIndex(p => p.id === product.id);
-        if (productIndex !== -1) {
-          // Calculate final effective price using hierarchy
-          const effectivePrice = this.calculateHierarchyPrice(updates);
-          
-          this.products[productIndex] = {
-            ...this.products[productIndex],
-            ...updates,
-            effectivePrice: effectivePrice,
-            hierarchyLastUpdated: new Date().toISOString()
-          };
-          
-          hierarchyUpdates.push({
-            productId: product.id,
-            productName: product.name,
-            oldPrice: product.price,
-            newEffectivePrice: effectivePrice,
-            hierarchyBreakdown: {
-              basePrice: updates.basePrice || updates.price,
-              variationPrice: updates.variationPrice,
-              seasonalDiscount: updates.seasonalDiscount,
-              seasonalDiscountType: updates.seasonalDiscountType
-            }
-          });
-          
-          updatedCount++;
-        }
-      }
-    }
-
-    return {
-      updatedCount,
-      totalFiltered: filteredProducts.length,
-      conflictCount: conflictProducts.length,
-      updateType: updateData.updateType,
-      hierarchyUpdates: hierarchyUpdates.slice(0, 10), // Return first 10 for reference
-      conflictProducts: conflictProducts.slice(0, 5),
-      summary: {
-        basePriceUpdates: hierarchyUpdates.filter(u => u.hierarchyBreakdown.basePrice !== u.oldPrice).length,
-        variationUpdates: hierarchyUpdates.filter(u => u.hierarchyBreakdown.variationPrice > 0).length,
-        seasonalDiscountUpdates: hierarchyUpdates.filter(u => u.hierarchyBreakdown.seasonalDiscount > 0).length
-      }
-    };
-  }
-
-  // Smart cropping using TensorFlow.js simulation
-  async smartCropImage(imageData, targetDimensions) {
-    try {
-      await this.delay(800); // Simulate TensorFlow.js processing
-      
-      // Simulate object detection and important region identification
-      const importantRegions = this.detectImportantRegions(imageData);
-      
-      // Calculate optimal crop based on detected regions
-      const cropRegion = this.calculateOptimalCrop(importantRegions, targetDimensions);
-      
-      return {
-        cropRegion,
-        confidence: 0.92,
-        objectsDetected: importantRegions.length,
-        processingTime: '800ms'
-      };
-      
-    } catch (error) {
-      console.error('Error in smart cropping:', error);
-      throw new Error('Smart cropping failed');
-    }
-  }
-
-  // Simulate object detection for smart cropping
-  detectImportantRegions(imageData) {
-    // Simulate detected objects/regions of interest
-    return [
-      { x: 120, y: 80, width: 360, height: 440, confidence: 0.95, type: 'product' },
-      { x: 200, y: 150, width: 200, height: 300, confidence: 0.88, type: 'main_subject' }
-    ];
-  }
-
-  // Calculate optimal crop region
-  calculateOptimalCrop(regions, targetDimensions) {
-    if (regions.length === 0) {
-      // Fallback to center crop
-      return {
-        x: 0,
-        y: 0,
-        width: targetDimensions.width,
-        height: targetDimensions.height
-      };
-    }
-    
-    // Find the most important region
-    const mainRegion = regions.reduce((max, region) => 
-      region.confidence > max.confidence ? region : max
-    );
-    
-    return {
-      x: Math.max(0, mainRegion.x - 50),
-      y: Math.max(0, mainRegion.y - 50),
-      width: Math.min(targetDimensions.width, mainRegion.width + 100),
-      height: Math.min(targetDimensions.height, mainRegion.height + 100)
-};
-  }
-
-  // Vendor-specific methods for vendor portal functionality
-  async getVendorProducts(vendorId) {
-    await this.delay(300);
-    
-    // Get vendor assignments (this would typically come from a vendor service)
-    const vendorAssignments = await this.getVendorProductAssignments(vendorId);
-    
-    if (!vendorAssignments || vendorAssignments.length === 0) {
-      return [];
-    }
-    
-    // Filter products to only those assigned to this vendor
-    const assignedProductIds = vendorAssignments.map(assignment => assignment.productId);
-    const vendorProducts = this.products.filter(product => 
-      assignedProductIds.includes(product.id)
-    );
-    
-    // Add vendor-specific pricing information
-    return vendorProducts.map(product => {
-      const assignment = vendorAssignments.find(a => a.productId === product.id);
-      return {
-        ...product,
-        vendorInfo: {
-          vendorId: vendorId,
-          assignedDate: assignment.assignedDate,
-          canEditPrice: assignment.canEditPrice || true,
-          canEditCost: assignment.canEditCost || false,
-          minMargin: assignment.minMargin || 5,
-          maxDiscount: assignment.maxDiscount || 20
-        }
-      };
-    });
-  }
-
-  async getVendorProductAssignments(vendorId) {
-    await this.delay(200);
-    
-    // Mock vendor product assignments
-    const assignments = [
-      { vendorId: 1, productId: 1, assignedDate: '2024-01-15', canEditPrice: true, canEditCost: false, minMargin: 5, maxDiscount: 15 },
-      { vendorId: 1, productId: 3, assignedDate: '2024-01-15', canEditPrice: true, canEditCost: false, minMargin: 8, maxDiscount: 20 },
-      { vendorId: 1, productId: 6, assignedDate: '2024-01-20', canEditPrice: true, canEditCost: true, minMargin: 10, maxDiscount: 25 },
-      { vendorId: 2, productId: 2, assignedDate: '2024-01-10', canEditPrice: true, canEditCost: false, minMargin: 5, maxDiscount: 10 },
-      { vendorId: 2, productId: 5, assignedDate: '2024-01-12', canEditPrice: true, canEditCost: true, minMargin: 7, maxDiscount: 15 },
-      { vendorId: 2, productId: 12, assignedDate: '2024-01-18', canEditPrice: true, canEditCost: false, minMargin: 12, maxDiscount: 18 }
-    ];
-    
-    return assignments.filter(assignment => assignment.vendorId === parseInt(vendorId));
-  }
-async updateVendorPrice(vendorId, productId, priceData) {
-    await this.delay(400);
-    
-    // Validate vendor has access to this product
-    const hasAccess = await this.validateVendorAccess(vendorId, productId);
-    if (!hasAccess.valid) {
-      throw new Error(hasAccess.error);
-    }
-    
-    const productIndex = this.products.findIndex(p => p.id === parseInt(productId));
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-    
-    const vendorAssignments = await this.getVendorProductAssignments(vendorId);
-    const assignment = vendorAssignments.find(a => a.productId === parseInt(productId));
-    
-    // Validate pricing rules for vendor
-    const validation = await this.validateVendorPricing(priceData, assignment, this.products[productIndex]);
-    if (!validation.isValid) {
-      throw new Error(validation.error);
-    }
-    
-    // Update the product with vendor pricing
-    const updatedProduct = {
-      ...this.products[productIndex],
-      ...priceData,
-      lastUpdatedBy: `vendor_${vendorId}`,
-      lastUpdatedAt: new Date().toISOString()
-    };
-    
-    // Recalculate profit metrics
-    const metrics = this.calculateProfitMetrics(updatedProduct);
-    updatedProduct.minSellingPrice = metrics.minSellingPrice;
-    updatedProduct.profitMargin = metrics.profitMargin;
-    
-    this.products[productIndex] = updatedProduct;
-    
-    return {
-      ...updatedProduct,
-      vendorInfo: {
-        vendorId: vendorId,
-        assignedDate: assignment.assignedDate,
-        canEditPrice: assignment.canEditPrice,
-        canEditCost: assignment.canEditCost,
-        minMargin: assignment.minMargin,
-        maxDiscount: assignment.maxDiscount
-      }
-    };
-  }
-
-  async submitPriceStockApproval(vendorId, productId, proposedChanges) {
-    await this.delay(500);
-    
-    // Validate vendor has access to this product
-    const hasAccess = await this.validateVendorAccess(vendorId, productId);
-    if (!hasAccess.valid) {
-      throw new Error(hasAccess.error);
-    }
-    
-    const productIndex = this.products.findIndex(p => p.id === parseInt(productId));
-    if (productIndex === -1) {
-      throw new Error('Product not found');
-    }
-    
-    const currentProduct = this.products[productIndex];
-    const vendorAssignments = await this.getVendorProductAssignments(vendorId);
-    const assignment = vendorAssignments.find(a => a.productId === parseInt(productId));
-    
-    // Validate all proposed changes
-    const validation = await this.validateVendorPricing(proposedChanges, assignment, currentProduct);
-    if (!validation.isValid) {
-      throw new Error(validation.error);
-    }
-    
-    // Create approval request data
-    const approvalRequestData = {
-      type: 'price_stock_change',
-      title: `Price/Stock Update - ${currentProduct.name}`,
-      description: this.generateApprovalDescription(currentProduct, proposedChanges),
-      submittedBy: `vendor_${vendorId}`,
-      priority: this.determineApprovalPriority(currentProduct, proposedChanges),
-      affectedEntity: {
-        entityType: 'product',
-        entityId: parseInt(productId),
-        entityName: currentProduct.name,
-        currentValues: {
-          price: currentProduct.price,
-          stock: currentProduct.stock,
-          purchasePrice: currentProduct.purchasePrice || 0
-        },
-        proposedValues: {
-          price: proposedChanges.price,
-          stock: proposedChanges.stock,
-          purchasePrice: proposedChanges.purchasePrice
-        }
-      },
-      vendorInfo: {
-        vendorId: vendorId,
-        vendorName: assignment.vendorName || `Vendor ${vendorId}`,
-        assignmentId: assignment.Id
-      },
-      businessImpact: this.calculateApprovalBusinessImpact(currentProduct, proposedChanges),
-      validationResults: validation
-    };
-    
-    // In a real implementation, this would integrate with approval workflow service
-    // For now, simulate the submission
-    const submissionResult = {
-      requestId: `REQ_${Date.now()}_${productId}`,
-      status: 'submitted',
-      submittedAt: new Date().toISOString(),
-      estimatedReviewTime: '2-4 hours',
-      reviewers: assignment.approvalRequired || ['manager', 'admin'],
-      trackingUrl: `/approvals/${Date.now()}`
-    };
-    
-    return submissionResult;
-  }
-
-  generateApprovalDescription(currentProduct, proposedChanges) {
-    const changes = [];
-    
-    if (proposedChanges.price !== currentProduct.price) {
-      const priceChange = ((proposedChanges.price - currentProduct.price) / currentProduct.price * 100).toFixed(1);
-      changes.push(`Price: Rs. ${currentProduct.price} → Rs. ${proposedChanges.price} (${priceChange > 0 ? '+' : ''}${priceChange}%)`);
-    }
-    
-    if (proposedChanges.stock !== currentProduct.stock) {
-      const stockChange = proposedChanges.stock - currentProduct.stock;
-      changes.push(`Stock: ${currentProduct.stock} → ${proposedChanges.stock} (${stockChange > 0 ? '+' : ''}${stockChange} units)`);
-    }
-    
-    if (proposedChanges.purchasePrice !== (currentProduct.purchasePrice || 0)) {
-      changes.push(`Cost: Rs. ${currentProduct.purchasePrice || 0} → Rs. ${proposedChanges.purchasePrice}`);
-    }
-    
-    return changes.length > 0 
-      ? `Proposed changes: ${changes.join(', ')}`
-      : 'No changes detected';
-  }
-
-  determineApprovalPriority(currentProduct, proposedChanges) {
-    const priceChangePercent = Math.abs(((proposedChanges.price - currentProduct.price) / currentProduct.price) * 100);
-    const stockChangePercent = Math.abs(((proposedChanges.stock - currentProduct.stock) / currentProduct.stock) * 100);
-    
-    if (priceChangePercent > 15 || stockChangePercent > 50) {
-      return 'high';
-    } else if (priceChangePercent > 10 || stockChangePercent > 25) {
-      return 'medium';
-    }
-    return 'normal';
-  }
-
-  calculateApprovalBusinessImpact(currentProduct, proposedChanges) {
-    const priceDiff = proposedChanges.price - currentProduct.price;
-    const stockDiff = proposedChanges.stock - currentProduct.stock;
-    
-    const revenueImpact = (priceDiff * currentProduct.stock) + (proposedChanges.price * stockDiff);
-    const marginImpact = currentProduct.purchasePrice > 0 
-      ? ((proposedChanges.price - currentProduct.purchasePrice) / currentProduct.purchasePrice * 100) - 
-        ((currentProduct.price - currentProduct.purchasePrice) / currentProduct.purchasePrice * 100)
-      : 0;
-    
-    return {
-      revenueImpact: Math.round(revenueImpact),
-      marginImpact: Math.round(marginImpact * 100) / 100,
-      stockImpact: stockDiff,
-      customerImpact: Math.abs(priceDiff / currentProduct.price * 100) > 10 ? 'medium' : 'low'
-    };
-  }
-
-async validateVendorAccess(vendorId, productId) {
-    try {
-      // Input validation
-      if (!vendorId || !productId) {
-        return {
-          valid: false,
-          error: 'Vendor ID and Product ID are required'
-        };
-      }
-      
-      const numericVendorId = parseInt(vendorId);
-      const numericProductId = parseInt(productId);
-      
-      if (isNaN(numericVendorId) || isNaN(numericProductId)) {
-        return {
-          valid: false,
-          error: 'Invalid vendor or product ID format'
-        };
-      }
-      
-      const assignments = await this.getVendorProductAssignments(numericVendorId);
-      const hasAssignment = assignments.some(a => a.productId === numericProductId);
-      
-      if (!hasAssignment) {
-        return {
-          valid: false,
-          error: 'You do not have permission to edit this product',
-          reason: 'no_assignment'
-        };
-      }
-      
-      return { valid: true };
-    } catch (error) {
-      console.error('Error validating vendor access:', error);
-      
-      if (error.message.includes('network') || error.message.includes('timeout')) {
-        return {
-          valid: false,
-          error: 'Network error occurred while validating access. Please try again.'
-        };
-      }
-      
-      return {
-        valid: false,
-        error: 'Unable to validate vendor access due to system error'
-      };
-    }
-  }
-
-async validateVendorPricing(priceData, assignment, currentProduct) {
-    try {
-      // Enhanced input validation
-      if (!priceData || !assignment || !currentProduct) {
-        return {
-          isValid: false,
-          error: 'Missing required data for pricing validation'
-        };
-      }
-      
-      // Safely parse and validate numeric inputs
-      let newPrice, newPurchasePrice, newStock;
-      
-      try {
-        newPrice = priceData.price !== undefined ? parseFloat(priceData.price) : currentProduct.price;
-        newPurchasePrice = priceData.purchasePrice !== undefined ? parseFloat(priceData.purchasePrice) : (currentProduct.purchasePrice || 0);
-        newStock = priceData.stock !== undefined ? parseInt(priceData.stock) : currentProduct.stock;
-      } catch (parseError) {
-        return {
-          isValid: false,
-          error: 'Invalid numeric values in pricing data'
-        };
-      }
-      
-      // Validate parsed values
-      if (isNaN(newPrice) || newPrice < 0) {
-        return {
-          isValid: false,
-          error: 'Invalid price value'
-        };
-      }
-      
-      if (isNaN(newPurchasePrice) || newPurchasePrice < 0) {
-        return {
-          isValid: false,
-          error: 'Invalid purchase price value'
-        };
-      }
-      
-      if (isNaN(newStock)) {
-        return {
-          isValid: false,
-          error: 'Invalid stock value'
-        };
-      }
-      
-      // Permission validation
-      if (priceData.purchasePrice !== undefined && !assignment.canEditCost) {
-        return {
-          isValid: false,
-          error: 'You do not have permission to edit cost prices',
-          permissionType: 'cost_edit'
-        };
-      }
-      
-      if (priceData.price !== undefined && !assignment.canEditPrice) {
-        return {
-          isValid: false,
-          error: 'You do not have permission to edit selling prices',
-          permissionType: 'price_edit'
-        };
-      }
-      
-      // Enhanced stock validation
-      if (newStock < 0) {
-        return {
-          isValid: false,
-          error: 'Stock cannot be negative',
-          field: 'stock',
-          currentValue: newStock
-        };
-      }
-      
-      if (newStock > 10000) {
-        return {
-          isValid: false,
-          error: 'Stock value exceeds maximum limit (10,000)',
-          field: 'stock',
-          currentValue: newStock,
-          maxAllowed: 10000
-        };
-      }
-      
-      // Enhanced price relationship validation
-      if (newPurchasePrice > 0 && newPrice <= newPurchasePrice) {
-        return {
-          isValid: false,
-          error: `Selling price (Rs. ${newPrice}) must be greater than buying price (Rs. ${newPurchasePrice})`,
-          field: 'price_relationship',
-          sellingPrice: newPrice,
-          buyingPrice: newPurchasePrice
-        };
-      }
-      
-      // Enhanced margin validation
-      if (newPurchasePrice > 0) {
-        const margin = ((newPrice - newPurchasePrice) / newPurchasePrice) * 100;
-        if (margin < assignment.minMargin) {
-          return {
-            isValid: false,
-            error: `Profit margin (${margin.toFixed(2)}%) must be at least ${assignment.minMargin}%`,
-            field: 'margin',
-            currentMargin: margin,
-            requiredMargin: assignment.minMargin
-          };
-        }
-      }
-      
-      // Enhanced price change validation
-      if (currentProduct.price > 0 && priceData.price !== undefined) {
-        const priceChangePercent = Math.abs(((newPrice - currentProduct.price) / currentProduct.price) * 100);
-        if (priceChangePercent > 20) {
-          return {
-            isValid: false,
-            error: `Price change (${priceChangePercent.toFixed(2)}%) exceeds maximum allowed (20%)`,
-            field: 'price_change',
-            changePercent: priceChangePercent,
-            maxAllowed: 20,
-            originalPrice: currentProduct.price,
-            newPrice: newPrice
-          };
-        }
-      }
-      
-      // Enhanced discount validation
-      if (currentProduct.price > 0 && newPrice < currentProduct.price) {
-        const discountPercentage = ((currentProduct.price - newPrice) / currentProduct.price) * 100;
-        if (discountPercentage > assignment.maxDiscount) {
-          return {
-            isValid: false,
-            error: `Discount (${discountPercentage.toFixed(2)}%) exceeds maximum allowed (${assignment.maxDiscount}%)`,
-            field: 'discount',
-            discountPercent: discountPercentage,
-            maxAllowed: assignment.maxDiscount
-          };
-        }
-      }
-      
-      // Enhanced business rules validation
-      try {
-        const generalValidation = this.validateProfitRules({
-          ...currentProduct,
-          ...priceData,
-          price: newPrice,
-          purchasePrice: newPurchasePrice,
-          stock: newStock
-        });
         
-        if (!generalValidation.isValid) {
-          return {
-            ...generalValidation,
-            source: 'business_rules'
-          };
+        // Check minimum pricing rules
+        const minPrice = currentPrice * 0.3; // 30% minimum
+        const discountedPrice = parseFloat(offerData.discountedPrice);
+        if (!isNaN(discountedPrice) && discountedPrice < minPrice) {
+          conflicts.push({
+            type: 'minimum_price_violation',
+            message: `Offer price (${discountedPrice.toFixed(2)}) below minimum allowed (${minPrice.toFixed(2)})`,
+            conflictData: { minPrice, offerPrice: discountedPrice },
+            severity: 'critical'
+          });
         }
-      } catch (validationError) {
-        console.error('Business rules validation error:', validationError);
-        return {
-          isValid: false,
-          error: 'Error validating business rules. Please try again.',
-          source: 'business_rules_error'
-        };
-      }
-      
-      return { 
-        isValid: true,
-        validatedData: {
-          price: newPrice,
-          purchasePrice: newPurchasePrice,
-          stock: newStock
-        },
-        validationMetadata: {
-          margin: newPurchasePrice > 0 ? ((newPrice - newPurchasePrice) / newPurchasePrice) * 100 : null,
-          priceChange: currentProduct.price > 0 ? ((newPrice - currentProduct.price) / currentProduct.price) * 100 : null,
-          validatedAt: new Date().toISOString()
-        }
-      };
-      
-    } catch (error) {
-      console.error('Error validating vendor pricing:', error);
-      
-      // Enhanced error classification
-      if (error.message.includes('network') || error.message.includes('timeout')) {
-        return {
-          isValid: false,
-          error: 'Network error occurred during validation. Please try again.'
-        };
-      } else if (error.message.includes('permission') || error.message.includes('access')) {
-        return {
-          isValid: false,
-          error: 'Access validation failed. Please contact administrator.'
-        };
-      } else {
-        return {
-          isValid: false,
-          error: 'Unable to validate pricing due to system error'
-        };
-      }
-    }
-  }
-
-  async getVendorStats(vendorId) {
-    await this.delay(200);
-    
-    try {
-      const vendorProducts = await this.getVendorProducts(vendorId);
-      
-      if (vendorProducts.length === 0) {
-        return {
-          totalProducts: 0,
-          averageMargin: 0,
-          totalValue: 0,
-          lowStockCount: 0
-        };
-      }
-      
-      const totalProducts = vendorProducts.length;
-      const totalMargin = vendorProducts.reduce((sum, product) => sum + (product.profitMargin || 0), 0);
-      const averageMargin = totalMargin / totalProducts;
-      const totalValue = vendorProducts.reduce((sum, product) => sum + (product.price * product.stock), 0);
-      const lowStockCount = vendorProducts.filter(product => product.stock <= (product.minStock || 10)).length;
-      
-      return {
-        totalProducts,
-        averageMargin: Math.round(averageMargin * 100) / 100,
-        totalValue: Math.round(totalValue * 100) / 100,
-        lowStockCount
-      };
-      
-    } catch (error) {
-      console.error('Error getting vendor stats:', error);
-      return {
-        totalProducts: 0,
-        averageMargin: 0,
-        totalValue: 0,
-lowStockCount: 0
-      };
-    }
-  }
-
-  // Enhanced vendor order management methods
-  async getVendorOrders(vendorId) {
-    await this.delay(300);
-    
-    try {
-      // Get orders containing products assigned to this vendor
-      const vendorProducts = await this.getVendorProducts(vendorId);
-      const vendorProductIds = vendorProducts.map(p => p.id);
-      
-      // Simulate getting orders from order service
-      // In real implementation, this would call orderService
-      const mockOrders = [
-        {
-          id: 10045,
-          customerId: "customer123",
-          items: [
-            {
-              productId: 1,
-              name: "Premium Carrots",
-              quantity: 5,
-              unit: "kg",
-              price: 80,
-              vendorId: vendorId
+        
+        // Check vendor pricing agreements
+        if (currentProduct?.vendorAssignments?.length > 0) {
+          for (const assignment of currentProduct.vendorAssignments) {
+            if (assignment.minimumPrice && !isNaN(discountedPrice) && discountedPrice < assignment.minimumPrice) {
+              conflicts.push({
+                type: 'vendor_agreement_violation',
+                message: `Offer violates vendor minimum price agreement`,
+                conflictData: assignment,
+                severity: 'high'
+              });
             }
-          ],
-          total: 400,
-          status: "confirmed",
-          packingStatus: "pending",
-          vendorActions: {
-            canPack: true,
-            packingInstructions: "Handle with care - fresh produce"
-          },
-          deliveryAddress: {
-            name: "Ahmad Hassan",
-            city: "Lahore",
-            phone: "+92 300 1234567"
-          },
-          createdAt: new Date().toISOString(),
-          estimatedDelivery: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          }
         }
-      ];
-      
-      // Filter orders that contain vendor's products
-      return mockOrders.filter(order => 
-        order.items.some(item => vendorProductIds.includes(item.productId))
-      );
-      
-    } catch (error) {
-      console.error('Error getting vendor orders:', error);
-      return [];
-    }
-  }
-
-  async updateOrderPackingStatus(vendorId, orderId, packingStatus, notes = '') {
-    await this.delay(400);
-    
-    try {
-      // Validate vendor has access to this order
-      const vendorOrders = await this.getVendorOrders(vendorId);
-      const order = vendorOrders.find(o => o.id === parseInt(orderId));
-      
-      if (!order) {
-        throw new Error('Order not found or access denied');
       }
       
-      if (!order.vendorActions?.canPack) {
-        throw new Error('Packing not allowed for this order');
+      // Check for pricing hierarchy conflicts
+      if (productData.category) {
+        const categoryProducts = allProducts.filter(p => 
+          p?.category === productData.category && p?.id !== productId
+        );
+        
+        for (const product of categoryProducts) {
+          if (product?.tier && productData.tier) {
+            const tierDiff = parseInt(product.tier) - parseInt(productData.tier);
+            const priceDiff = parseFloat(product.price) - currentPrice;
+            
+            // Check if pricing doesn't match tier hierarchy
+            if ((tierDiff > 0 && priceDiff < 0) || (tierDiff < 0 && priceDiff > 0)) {
+              conflicts.push({
+                type: 'tier_pricing_conflict',
+                message: `Price doesn't align with product tier hierarchy`,
+                conflictData: { conflictProduct: product, tierDiff, priceDiff },
+                severity: 'medium'
+              });
+            }
+          }
+        }
       }
       
-      // Update packing status
-      const updatedOrder = {
-        ...order,
-        packingStatus: packingStatus,
-        packingNotes: notes,
-        packedAt: packingStatus === 'packed' ? new Date().toISOString() : null,
-        packedBy: `vendor_${vendorId}`,
-        lastUpdated: new Date().toISOString()
-      };
-      
-      return updatedOrder;
-      
-    } catch (error) {
-      console.error('Error updating packing status:', error);
-      throw error;
-    }
-  }
-
-async getVendorOrdersStats(vendorId) {
-    await this.delay(200);
-    
-    try {
-      const vendorOrders = await this.getVendorOrders(vendorId);
-      
-      const stats = {
-        totalOrders: vendorOrders.length,
-        pendingPacking: vendorOrders.filter(o => o.packingStatus === 'pending').length,
-        packedOrders: vendorOrders.filter(o => o.packingStatus === 'packed').length,
-        totalValue: vendorOrders.reduce((sum, order) => sum + (order.total || 0), 0),
-        averageOrderValue: vendorOrders.length > 0 
-          ? vendorOrders.reduce((sum, order) => sum + (order.total || 0), 0) / vendorOrders.length 
-          : 0
-      };
-      
-      return stats;
-      
-    } catch (error) {
-      console.error('Error getting vendor order stats:', error);
       return {
-        totalOrders: 0,
-        pendingPacking: 0,
-        packedOrders: 0,
-        totalValue: 0,
-        averageOrderValue: 0
+        isValid: conflicts.length === 0,
+        conflicts,
+        summary: {
+          total: conflicts.length,
+          critical: conflicts.filter(c => c.severity === 'critical').length,
+          high: conflicts.filter(c => c.severity === 'high').length,
+          medium: conflicts.filter(c => c.severity === 'medium').length
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error validating offer conflicts:', error);
+      return {
+        isValid: false,
+        conflicts: [{
+          type: 'validation_error',
+          message: 'Failed to validate offer conflicts',
+          conflictData: error,
+          severity: 'critical'
+        }],
+        summary: { total: 1, critical: 1, high: 0, medium: 0 }
       };
     }
-  }
-
-  // Admin vendor assignment functionality
-  async assignProductsToVendor(vendorId, productIds) {
-    await this.delay(400);
-    
-    if (!vendorId || !productIds || !Array.isArray(productIds) || productIds.length === 0) {
-      throw new Error('Invalid vendor ID or product IDs');
-    }
-    
-    // Validate all products exist
-    const invalidProducts = productIds.filter(productId => 
-      !this.products.find(p => p.id === parseInt(productId))
-    );
-    
-    if (invalidProducts.length > 0) {
-      throw new Error(`Products not found: ${invalidProducts.join(', ')}`);
-    }
-    
-    // Create assignment records (in real app, this would be stored in database)
-    const assignments = productIds.map(productId => ({
-      Id: this.getNextAssignmentId(),
-      vendorId: parseInt(vendorId),
-      productId: parseInt(productId),
-      assignedDate: new Date().toISOString(),
-      assignedBy: 'admin',
-      canEditPrice: true,
-      canEditCost: false,
-      minMargin: 5,
-      maxDiscount: 20,
-      status: 'active'
-    }));
-    
-    // Update products with vendor assignment info
-    productIds.forEach(productId => {
-      const productIndex = this.products.findIndex(p => p.id === parseInt(productId));
-      if (productIndex !== -1) {
-        this.products[productIndex] = {
-          ...this.products[productIndex],
-          assignedVendor: parseInt(vendorId),
-          assignedDate: new Date().toISOString(),
-          lastUpdated: new Date().toISOString()
-        };
-      }
-    });
-    
-    return {
-      assignments: assignments,
-      assignedCount: productIds.length,
-      vendorId: parseInt(vendorId),
-      assignedAt: new Date().toISOString()
-    };
-  }
-
-  getNextAssignmentId() {
-    // Simple ID generation for assignments
-    return Math.floor(Math.random() * 1000000) + Date.now();
   }
 }
 
