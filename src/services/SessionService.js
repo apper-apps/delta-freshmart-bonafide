@@ -969,10 +969,6 @@ if (!sessionService) {
   };
 }
 
-// Create singleton instance
-const sessionService = new SessionService();
-
 // Export singleton instance as default and class for flexibility
 export default sessionService;
-export { SessionService };
 export { SessionService };
