@@ -641,8 +641,8 @@ class SessionService {
    * Validate existing session
    * @param {Object} session - Session to validate
    * @returns {Promise<boolean>} True if valid
-   */
-async validateSession(session = null) {
+*/
+  async validateSession(session = null) {
     try {
       const sessionToValidate = session || this.currentSession;
       if (!sessionToValidate) {
@@ -729,47 +729,14 @@ function createSessionService() {
   }
 }
 
+// Create and export singleton instance
 let sessionService;
 
 try {
   sessionService = createSessionService();
 } catch (error) {
   console.error('Failed to initialize SessionService:', error);
-  // Create a minimal fallback service to prevent app crashes
-  sessionService = {
-    getCurrentSession: async () => null,
-    isAuthenticated: async () => false,
-    getCurrentUser: async () => null,
-    getToken: async () => null,
-    createSession: async () => null,
-    validateSession: async () => false,
-    clearSession: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    getSessionInfo: async () => ({ user: null, permissions: [] }),
-    createGuestSession: async () => null,
-    initialized: false,
-    error: error.message,
-    isFallback: true
-  };
-}
-// Singleton is already initialized above with proper error handling
-// Export the singleton instance and class
-// Validate singleton before export
-if (!sessionService) {
-  console.error('SessionService failed to initialize - using minimal fallback');
-  sessionService = {
-    getCurrentSession: async () => null,
-    isAuthenticated: async () => false,
-    getCurrentUser: async () => null,
-    getToken: async () => null,
-    createSession: async () => null,
-    validateSession: async () => false,
-    clearSession: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    getSessionInfo: async () => ({ user: null, permissions: [] })
-  };
+  sessionService = createSessionService(); // createSessionService already handles fallbacks  
 }
 
 // Export singleton instance as default and class for flexibility
