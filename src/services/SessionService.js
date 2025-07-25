@@ -330,47 +330,6 @@ validateSessionData(session) {
    * @param {Object} session - Session to validate
    * @returns {boolean} True if valid
    */
-  validateSessionData(session) {
-    try {
-      if (!session || typeof session !== 'object') {
-        return false;
-      }
-
-      // Check required properties - be flexible with id field
-      if ((!session.id && !session.sessionId) || !session.createdAt) {
-        return false;
-      }
-
-      // Validate timestamps - handle both numeric and string formats for backward compatibility
-      let createdAt = session.createdAt;
-      if (typeof createdAt === 'string') {
-        createdAt = new Date(createdAt).getTime();
-      }
-      if (typeof createdAt !== 'number' || createdAt <= 0 || isNaN(createdAt)) {
-        return false;
-      }
-
-      if (session.expiresAt) {
-        let expiresAt = session.expiresAt;
-        if (typeof expiresAt === 'string') {
-          expiresAt = new Date(expiresAt).getTime();
-        }
-        if (typeof expiresAt !== 'number' || expiresAt <= 0 || isNaN(expiresAt)) {
-          return false;
-        }
-      }
-
-      // Validate user object if present
-      if (session.user && typeof session.user !== 'object') {
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('SessionService: Error validating session data:', error);
-      return false;
-    }
-  }
 
   /**
    * Enhanced session expiration check with error handling
@@ -823,7 +782,7 @@ validateSessionData(session) {
   /**
    * Create minimal session as last resort fallback
    * @returns {Object} Minimal valid session
-   */
+*/
   createMinimalSession() {
     console.warn('SessionService: Creating minimal fallback session');
     
@@ -831,19 +790,49 @@ validateSessionData(session) {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + (60 * 60 * 1000)); // 1 hour
     
-    return {
+    const minimalSession = {
       id: sessionId,
       sessionId: sessionId,
       user: {
         id: `minimal_user_${Date.now()}`,
         username: 'guest',
-        role: 'guest'
+        role: 'guest',
+        name: 'Guest User',
+        email: null,
+        isAuthenticated: false,
+        permissions: ['view_products']
       },
       createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       isAuthenticated: false,
-      token: null
+      token: null,
+      refreshToken: null,
+      metadata: {
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        createdBy: 'minimal-session-service',
+        sessionType: 'minimal'
+      }
     };
+    
+    // Validate the minimal session to ensure it meets requirements
+    if (!this.validateSessionData(minimalSession)) {
+      console.error('SessionService: Created minimal session failed validation, using absolute fallback');
+      // Return absolute minimal structure that should always pass validation
+      return {
+        id: sessionId,
+        sessionId: sessionId,
+        user: {
+          id: `fallback_user_${Date.now()}`,
+          username: 'guest',
+          role: 'guest'
+        },
+        createdAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString()
+      };
+    }
+    
+    return minimalSession;
   }
 /**
    * Create guest session for non-authenticated users
