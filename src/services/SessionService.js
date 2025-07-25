@@ -631,8 +631,30 @@ const sessionToValidate = session || this.currentSession;
     }
   }
 }
-// Create singleton instance
-const sessionService = new SessionService();
+// Create singleton instance with error handling
+let sessionService;
+try {
+  sessionService = new SessionService();
+} catch (error) {
+  console.error('Failed to initialize SessionService:', error);
+  // Create minimal fallback service
+  sessionService = {
+    getCurrentSession: async () => null,
+    isAuthenticated: async () => false,
+    getCurrentUser: async () => null,
+    getToken: async () => null,
+    createSession: async () => null,
+    validateSession: async () => false,
+    clearSession: () => {},
+    refreshSession: async () => null,
+    updateUser: async () => null,
+    getSessionInfo: async () => ({}),
+    addListener: () => {},
+    removeListener: () => {},
+    initialized: false,
+    error: error.message
+  };
+}
 
 // Export singleton instance as default and class for flexibility
 export default sessionService;
