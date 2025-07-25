@@ -1197,11 +1197,10 @@ url: `https://via.placeholder.com/600x600/2196F3/ffffff?text=AI+Generated+${enco
           details: 'Base price must be greater than 0',
           field: 'basePrice',
           currentValue: basePrice
-        });
+});
       }
-}
-  }
 
+      // Validate variation price hierarchy with enhanced checks
   // Validate offer conflicts with existing pricing and discounts
   async validateOfferConflicts(productData, offerData = null) {
     try {
@@ -1313,13 +1312,7 @@ url: `https://via.placeholder.com/600x600/2196F3/ffffff?text=AI+Generated+${enco
       };
     }
   }
-
-  // Calculate hierarchical pricing based on category and vendor relationships
-  calculateHierarchyPrice(productData) {
-    const basePrice = parseFloat(productData.price) || 0;
-          currentValue: basePrice
-        });
-      }
+// Enhanced seasonal discount validation
 
       // Validate variation price hierarchy with enhanced checks
       if (variationPrice > 0) {
