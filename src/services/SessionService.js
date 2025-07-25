@@ -658,317 +658,579 @@ class SessionService {
     }
   }
 }
-// Create singleton instance with improved error handling
-function createSessionService() {
-  try {
-    // Ensure SessionService class is properly referenced
-    if (typeof SessionService === 'undefined') {
-      throw new Error('SessionService class is not defined');
-    }
+
+/**
+ * Session Service - Manages user sessions, authentication state, and session persistence
+ * Provides comprehensive session management with error handling and recovery mechanisms
+ */
+class SessionService {
+  constructor() {
+    this.currentSession = null;
+    this.isInitialized = false;
+    this.listeners = [];
+    this.storageKey = 'freshmart_session';
+    this.refreshPromise = null;
+    this.initPromise = null;
     
-    if (typeof SessionService !== 'function') {
-      throw new Error('SessionService is not a constructor function');
-    }
-    
-    // Create new instance with proper error handling
-    const serviceInstance = new SessionService();
-    
-    // Validate the instance has required methods
-    const requiredMethods = [
-      'getCurrentSession', 'isAuthenticated', 'getCurrentUser', 'getToken',
-      'createSession', 'validateSession', 'clearSession', 'refreshSession',
-      'updateUser', 'createGuestSession', 'getSessionInfo', 'addListener', 'removeListener'
-    ];
-    
-    for (const method of requiredMethods) {
-      if (typeof serviceInstance[method] !== 'function') {
-        throw new Error(`SessionService instance missing required method: ${method}`);
-      }
-    }
-    
-    return serviceInstance;
-  } catch (error) {
-    console.error('Failed to initialize SessionService:', error);
-    console.error('SessionService constructor type:', typeof SessionService);
-    console.error('Available SessionService properties:', SessionService ? Object.getOwnPropertyNames(SessionService) : 'undefined');
-    
-    // Create robust fallback service that matches the interface
-    return {
-      // Core session methods
-      getCurrentSession: async () => {
-        console.warn('SessionService: Using fallback getCurrentSession');
-        return null;
-      },
-      isAuthenticated: async () => {
-        console.warn('SessionService: Using fallback isAuthenticated');
-        return false;
-      },
-      getCurrentUser: async () => {
-        console.warn('SessionService: Using fallback getCurrentUser');
-        return null;
-      },
-      getToken: async () => {
-        console.warn('SessionService: Using fallback getToken');
-        return null;
-      },
-      
-      // Session management methods
-      createSession: async (userData, token = null) => {
-        console.warn('SessionService: Using fallback createSession');
-        return null;
-      },
-      validateSession: async (session = null) => {
-        console.warn('SessionService: Using fallback validateSession');
-        return false;
-      },
-      clearSession: () => {
-        console.warn('SessionService: Using fallback clearSession');
-      },
-      refreshSession: async (session = null) => {
-        console.warn('SessionService: Using fallback refreshSession');
-        return null;
-      },
-      updateUser: async (userData) => {
-        console.warn('SessionService: Using fallback updateUser');
-        return null;
-      },
-      createGuestSession: async () => {
-        console.warn('SessionService: Using fallback createGuestSession');
-        return null;
-      },
-      
-      // Utility methods
-      getSessionInfo: async () => {
-        console.warn('SessionService: Using fallback getSessionInfo');
-        return {};
-      },
-      addListener: (callback) => {
-        console.warn('SessionService: Using fallback addListener');
-      },
-      removeListener: (callback) => {
-        console.warn('SessionService: Using fallback removeListener');
-      },
-      
-      // State flags
-      initialized: false,
-      error: error.message,
-      isFallback: true
+    // Session configuration
+    this.config = {
+      sessionTimeout: 24 * 60 * 60 * 1000, // 24 hours
+      refreshThreshold: 30 * 60 * 1000, // 30 minutes
+      maxRetries: 3,
+      retryDelay: 1000
     };
-  }
-}
 
-// Create and export singleton instance
-let sessionService;
-
-try {
-  // Ensure createSessionService function exists and is callable
-  if (typeof createSessionService !== 'function') {
-    throw new Error('createSessionService is not defined or not a function');
+    // Bind methods to preserve context
+    this.getCurrentSession = this.getCurrentSession.bind(this);
+    this.createGuestSession = this.createGuestSession.bind(this);
+    this.validateSessionData = this.validateSessionData.bind(this);
+    this.refreshSession = this.refreshSession.bind(this);
+    
+    // Initialize session on construction
+    this._initializeAsync();
   }
-  
-  try {
-    sessionService = createSessionService();
+
+  /**
+   * Async initialization to avoid blocking constructor
+   */
+  _initializeAsync() {
+    if (this.initPromise) return this.initPromise;
     
-    // Validate the created service has required methods
-    if (!sessionService || typeof sessionService !== 'object') {
-      throw new Error('SessionService creation failed - invalid service object');
-    }
-    
-    // Additional validation for critical methods
-    const criticalMethods = ['getCurrentSession', 'isAuthenticated', 'createSession'];
-    for (const method of criticalMethods) {
-      if (typeof sessionService[method] !== 'function') {
-        console.warn(`SessionService missing critical method: ${method}`);
-      }
-    }
-    
-    console.log('SessionService initialized successfully:', {
-      isFallback: !!sessionService.isFallback,
-      initialized: !!sessionService.initialized,
-      hasError: !!sessionService.error
+    this.initPromise = this._ensureInitialized().catch(error => {
+      console.error('SessionService initialization failed:', error);
+      // Don't throw - allow fallback mechanisms to handle
     });
     
-  } catch (initError) {
-    console.error('Critical error during SessionService initialization:', initError);
-    
-    // Create emergency fallback
-    sessionService = {
-      getCurrentSession: async () => null,
-      isAuthenticated: async () => false,
-      getCurrentUser: async () => null,
-      getToken: async () => null,
-      createSession: async () => null,
-      validateSession: async () => false,
-      clearSession: () => {},
-      refreshSession: async () => null,
-      updateUser: async () => null,
-      createGuestSession: async () => null,
-      getSessionInfo: async () => ({}),
-      addListener: () => {},
-      removeListener: () => {},
-      initialized: false,
-      error: initError.message,
-      isFallback: true,
-      isEmergencyFallback: true
-    };
+    return this.initPromise;
   }
-  
-} catch (error) {
-  console.error('Failed to initialize SessionService:', error);
-  
-  // Helper functions for fallback service
-  const createMinimalSessionFallback = () => {
-    const now = new Date();
-    const expiryTime = new Date();
-    expiryTime.setHours(expiryTime.getHours() + 24);
-    
-    return {
-      id: `session_${Date.now()}`,
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      expiresAt: expiryTime.toISOString(),
-      lastActivity: now.toISOString(),
-      user: null,
-      token: null,
-      isEmergencySession: false
-    };
-  };
-  
-  const createGuestSessionFallback = async () => {
-    const guestSession = createMinimalSessionFallback();
-    guestSession.user = {
-      id: 'guest',
-      username: 'Guest User',
-      role: 'guest',
-      email: null,
-      isGuest: true,
-      permissions: ['read', 'browse_products']
-    };
-    guestSession.isEmergencySession = true;
-    
+
+  /**
+   * Ensures the session service is properly initialized
+   */
+  async _ensureInitialized() {
+    if (this.isInitialized) return;
+
     try {
-      localStorage.setItem('user_session', JSON.stringify(guestSession));
-    } catch (storageError) {
-      console.error('Failed to store guest session:', storageError);
-    }
-    
-    return guestSession;
-  };
-  
-  const isSessionExpiredFallback = (session) => {
-    try {
-      if (!session || !session.expiresAt) return true;
-      const expiryTime = new Date(session.expiresAt);
-      const currentTime = new Date();
-      return currentTime >= expiryTime;
-    } catch (error) {
-      return true;
-    }
-  };
-  
-  const clearStoredSessionFallback = () => {
-    try {
-      const keys = ['user_session', 'current_user', 'auth_token'];
-      keys.forEach(key => localStorage.removeItem(key));
-    } catch (error) {
-      console.error('Failed to clear stored session:', error);
-    }
-  };
-  
-  // Create a minimal fallback service instead of retrying the same operation
-  sessionService = {
-    // Essential methods with safe implementations
-    async getCurrentSession() {
-      try {
-        return await createGuestSessionFallback();
-      } catch (err) {
-        console.error('Fallback getCurrentSession failed:', err);
-        return createMinimalSessionFallback();
+      console.log('SessionService: Initializing...');
+      
+      // Check for existing session in storage
+      const storedSession = this.getStoredSession();
+      if (storedSession && this.validateSessionData(storedSession)) {
+        if (!this.isSessionExpired(storedSession)) {
+          this.currentSession = storedSession;
+          console.log('SessionService: Restored existing session');
+        } else {
+          console.log('SessionService: Stored session expired, clearing');
+          this.clearStoredSession();
+        }
       }
-    },
-    
-    async isAuthenticated() {
-      try {
-        const session = await this.getCurrentSession();
-        return session && session.user && !isSessionExpiredFallback(session);
-      } catch (err) {
-        console.error('Fallback isAuthenticated failed:', err);
+
+      // If no valid session, create a minimal one
+      if (!this.currentSession) {
+        this.currentSession = this.createMinimalSession();
+        console.log('SessionService: Created minimal session');
+      }
+
+      this.isInitialized = true;
+      this.notifyListeners('initialized', this.currentSession);
+      
+    } catch (error) {
+      console.error('SessionService initialization error:', error);
+      // Create emergency fallback session
+      this.currentSession = this.createMinimalSession();
+      this.isInitialized = true;
+    }
+  }
+
+  /**
+   * Initialize session - public method for external initialization
+   */
+  async initializeSession() {
+    return this._ensureInitialized();
+  }
+
+  /**
+   * Validates session data structure and integrity
+   */
+  validateSessionData(session) {
+    if (!session || typeof session !== 'object') {
+      return false;
+    }
+
+    // Check required fields
+    const requiredFields = ['sessionId', 'user', 'createdAt'];
+    for (const field of requiredFields) {
+      if (!(field in session)) {
+        console.warn(`SessionService: Missing required field: ${field}`);
         return false;
       }
-    },
-    
-    async getCurrentUser() {
-      try {
-        const session = await this.getCurrentSession();
-        return session?.user || null;
-      } catch (err) {
-        console.error('Fallback getCurrentUser failed:', err);
-        return null;
-      }
-    },
-    
-    async getToken() {
-      try {
-        const session = await this.getCurrentSession();
-        return session?.token || null;
-      } catch (err) {
-        console.error('Fallback getToken failed:', err);
-        return null;
-      }
-    },
-    
-    clearSession() {
-      try {
-        clearStoredSessionFallback();
-      } catch (err) {
-        console.error('Fallback clearSession failed:', err);
-      }
-    },
-    
-    addListener(callback) {
-      // No-op fallback
-      console.warn('SessionService fallback: addListener not implemented');
-      return () => {}; // Return empty cleanup function
-    },
-    
-    removeListener(callback) {
-      // No-op fallback
-      console.warn('SessionService fallback: removeListener not implemented');
     }
-  };
-  
-  // Log that we're using fallback service
-  console.warn('Using fallback SessionService due to initialization failure');
-}
 
-// Final validation to ensure sessionService is never undefined
-if (!sessionService) {
-  console.error('Critical: SessionService is still undefined after fallback creation');
-  sessionService = {
-    async getCurrentSession() { 
-      const now = new Date();
-      const expiryTime = new Date();
-      expiryTime.setHours(expiryTime.getHours() + 24);
-      return {
-        id: `session_${Date.now()}`,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-        expiresAt: expiryTime.toISOString(),
-        lastActivity: now.toISOString(),
-        user: null,
-        token: null,
-        isEmergencySession: false
+    // Validate user object
+    if (!session.user || typeof session.user !== 'object') {
+      console.warn('SessionService: Invalid user object');
+      return false;
+    }
+
+    // Validate dates
+    if (!this.isValidDate(session.createdAt)) {
+      console.warn('SessionService: Invalid createdAt date');
+      return false;
+    }
+
+    if (session.expiresAt && !this.isValidDate(session.expiresAt)) {
+      console.warn('SessionService: Invalid expiresAt date');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Checks if a session has expired
+   */
+  isSessionExpired(session) {
+    if (!session || !session.expiresAt) return false;
+    
+    try {
+      const expiryTime = new Date(session.expiresAt).getTime();
+      const currentTime = Date.now();
+      return currentTime >= expiryTime;
+    } catch (error) {
+      console.warn('SessionService: Error checking session expiry:', error);
+      return true; // Assume expired on error
+    }
+  }
+
+  /**
+   * Retrieves stored session from localStorage with error handling
+   */
+  getStoredSession() {
+    try {
+      const stored = localStorage.getItem(this.storageKey);
+      if (!stored) return null;
+      
+      return JSON.parse(stored);
+    } catch (error) {
+      console.warn('SessionService: Error reading stored session:', error);
+      this.clearStoredSession();
+      return null;
+    }
+  }
+
+  /**
+   * Clears stored session from localStorage
+   */
+  clearStoredSession() {
+    try {
+      localStorage.removeItem(this.storageKey);
+    } catch (error) {
+      console.warn('SessionService: Error clearing stored session:', error);
+    }
+  }
+
+  /**
+   * Validates if a string is a valid date
+   */
+  isValidDate(dateString) {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date.getTime());
+  }
+
+  /**
+   * Creates a guest session with minimal permissions
+   */
+  async createGuestSession() {
+    try {
+      console.log('SessionService: Creating guest session');
+      
+      const guestSession = {
+        sessionId: this.generateSessionId(),
+        user: {
+          id: 'guest_' + Date.now(),
+          email: null,
+          name: 'Guest User',
+          role: 'guest',
+          isGuest: true,
+          permissions: this.getDefaultPermissions('guest')
+        },
+        isGuest: true,
+        isMinimalSession: false,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + this.config.sessionTimeout).toISOString(),
+        lastActivity: new Date().toISOString()
       };
-    },
-    async isAuthenticated() { return false; },
-    async getCurrentUser() { return null; },
-    async getToken() { return null; },
-    clearSession() {},
-    addListener() { return () => {}; },
-    removeListener() {}
-  };
+
+      this.currentSession = guestSession;
+      this.storeSession(guestSession);
+      this.notifyListeners('session_created', guestSession);
+      
+      return guestSession;
+    } catch (error) {
+      console.error('SessionService: Error creating guest session:', error);
+      return this.createMinimalSession();
+    }
+  }
+
+  /**
+   * Creates a minimal session for emergency fallback
+   */
+  createMinimalSession() {
+    return {
+      sessionId: this.generateSessionId(),
+      user: {
+        id: 'minimal_' + Date.now(),
+        email: null,
+        name: 'Anonymous',
+        role: 'anonymous',
+        isGuest: true,
+        permissions: []
+      },
+      isGuest: true,
+      isMinimalSession: true,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + this.config.sessionTimeout).toISOString(),
+      lastActivity: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Gets the current session with initialization check
+   */
+  async getCurrentSession() {
+    try {
+      // Ensure initialization is complete
+      await this._ensureInitialized();
+      
+      if (!this.currentSession) {
+        console.warn('SessionService: No current session, creating guest session');
+        return await this.createGuestSession();
+      }
+
+      // Check if session needs refresh
+      if (this.shouldRefreshSession(this.currentSession)) {
+        console.log('SessionService: Session needs refresh');
+        return await this.refreshSession();
+      }
+
+      // Update last activity
+      this.currentSession.lastActivity = new Date().toISOString();
+      this.storeSession(this.currentSession);
+      
+      return this.currentSession;
+    } catch (error) {
+      console.error('SessionService: Error getting current session:', error);
+      // Return minimal session as fallback
+      return this.createMinimalSession();
+    }
+  }
+
+  /**
+   * Checks if session should be refreshed
+   */
+  shouldRefreshSession(session) {
+    if (!session || !session.lastActivity) return false;
+    
+    try {
+      const lastActivity = new Date(session.lastActivity).getTime();
+      const now = Date.now();
+      return (now - lastActivity) > this.config.refreshThreshold;
+    } catch (error) {
+      console.warn('SessionService: Error checking refresh needed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Updates user data in current session
+   */
+  async updateUser(userData) {
+    try {
+      await this._ensureInitialized();
+      
+      if (!this.currentSession) {
+        throw new Error('No active session to update');
+      }
+
+      // Merge user data
+      this.currentSession.user = {
+        ...this.currentSession.user,
+        ...userData
+      };
+
+      this.currentSession.lastActivity = new Date().toISOString();
+      this.storeSession(this.currentSession);
+      this.notifyListeners('user_updated', this.currentSession.user);
+      
+      return this.currentSession;
+    } catch (error) {
+      console.error('SessionService: Error updating user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Refreshes the current session
+   */
+  async refreshSession(session = null) {
+    // Prevent multiple simultaneous refresh operations
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this._performRefresh(session);
+    
+    try {
+      const result = await this.refreshPromise;
+      return result;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+
+  /**
+   * Performs the actual session refresh
+   */
+  async _performRefresh(session = null) {
+    try {
+      const sessionToRefresh = session || this.currentSession;
+      
+      if (!sessionToRefresh) {
+        console.log('SessionService: No session to refresh, creating new guest session');
+        return await this.createGuestSession();
+      }
+
+      // Create refreshed session
+      const refreshedSession = {
+        ...sessionToRefresh,
+        lastActivity: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + this.config.sessionTimeout).toISOString()
+      };
+
+      this.currentSession = refreshedSession;
+      this.storeSession(refreshedSession);
+      this.notifyListeners('session_refreshed', refreshedSession);
+      
+      return refreshedSession;
+    } catch (error) {
+      console.error('SessionService: Error refreshing session:', error);
+      // Fallback to creating new guest session
+      return await this.createGuestSession();
+    }
+  }
+
+  /**
+   * Clears the current session
+   */
+  clearSession() {
+    try {
+      const oldSession = this.currentSession;
+      this.currentSession = null;
+      this.clearStoredSession();
+      this.notifyListeners('session_cleared', oldSession);
+      console.log('SessionService: Session cleared');
+    } catch (error) {
+      console.error('SessionService: Error clearing session:', error);
+    }
+  }
+
+  /**
+   * Stores session in localStorage
+   */
+  storeSession(session) {
+    try {
+      if (!session) return;
+      localStorage.setItem(this.storageKey, JSON.stringify(session));
+    } catch (error) {
+      console.warn('SessionService: Error storing session:', error);
+    }
+  }
+
+  /**
+   * Generates a unique session ID
+   */
+  generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
+   * Adds event listener for session changes
+   */
+  addListener(callback) {
+    if (typeof callback === 'function') {
+      this.listeners.push(callback);
+    }
+  }
+
+  /**
+   * Removes event listener
+   */
+  removeListener(callback) {
+    const index = this.listeners.indexOf(callback);
+    if (index > -1) {
+      this.listeners.splice(index, 1);
+    }
+  }
+
+  /**
+   * Notifies all listeners of session events
+   */
+  notifyListeners(event, data) {
+    this.listeners.forEach(callback => {
+      try {
+        callback(event, data);
+      } catch (error) {
+        console.error('SessionService: Error in listener callback:', error);
+      }
+    });
+  }
+
+  /**
+   * Gets session information for debugging
+   */
+  async getSessionInfo() {
+    try {
+      await this._ensureInitialized();
+      
+      return {
+        hasSession: !!this.currentSession,
+        isInitialized: this.isInitialized,
+        sessionId: this.currentSession?.sessionId,
+        userId: this.currentSession?.user?.id,
+        userRole: this.currentSession?.user?.role,
+        isGuest: this.currentSession?.isGuest,
+        isMinimal: this.currentSession?.isMinimalSession,
+        createdAt: this.currentSession?.createdAt,
+        lastActivity: this.currentSession?.lastActivity,
+        expiresAt: this.currentSession?.expiresAt
+      };
+    } catch (error) {
+      console.error('SessionService: Error getting session info:', error);
+      return { error: error.message };
+    }
+  }
+
+  /**
+   * Gets default permissions for a role
+   */
+  getDefaultPermissions(role) {
+    const permissions = {
+      anonymous: [],
+      guest: ['view_products', 'add_to_cart'],
+      user: ['view_products', 'add_to_cart', 'place_orders', 'view_orders'],
+      admin: ['*'], // All permissions
+      vendor: ['manage_products', 'view_orders', 'update_inventory']
+    };
+
+    return permissions[role] || permissions.anonymous;
+  }
+
+  /**
+   * Checks if user is authenticated
+   */
+  async isAuthenticated() {
+    try {
+      const session = await this.getCurrentSession();
+      return !!(session && session.user && !session.isMinimalSession);
+    } catch (error) {
+      console.error('SessionService: Error checking authentication:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Gets current user information
+   */
+  async getCurrentUser() {
+    try {
+      const session = await this.getCurrentSession();
+      return session?.user || null;
+    } catch (error) {
+      console.error('SessionService: Error getting current user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets authentication token (placeholder for future implementation)
+   */
+  async getToken() {
+    try {
+      const session = await this.getCurrentSession();
+      return session?.token || null;
+    } catch (error) {
+      console.error('SessionService: Error getting token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Creates a new session with user data and token
+   */
+  async createSession(userData, token = null) {
+    try {
+      const session = {
+        sessionId: this.generateSessionId(),
+        user: {
+          ...userData,
+          permissions: this.getDefaultPermissions(userData.role || 'user')
+        },
+        token,
+        isGuest: false,
+        isMinimalSession: false,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + this.config.sessionTimeout).toISOString(),
+        lastActivity: new Date().toISOString()
+      };
+
+      this.currentSession = session;
+      this.storeSession(session);
+      this.notifyListeners('session_created', session);
+      
+      return session;
+    } catch (error) {
+      console.error('SessionService: Error creating session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validates current or provided session
+   */
+  async validateSession(session = null) {
+    try {
+      const sessionToValidate = session || await this.getCurrentSession();
+      
+      if (!sessionToValidate) {
+        return { valid: false, reason: 'No session found' };
+      }
+
+      if (!this.validateSessionData(sessionToValidate)) {
+        return { valid: false, reason: 'Invalid session data structure' };
+      }
+
+      if (this.isSessionExpired(sessionToValidate)) {
+        return { valid: false, reason: 'Session expired' };
+      }
+
+      return { valid: true, session: sessionToValidate };
+    } catch (error) {
+      console.error('SessionService: Error validating session:', error);
+      return { valid: false, reason: 'Validation error: ' + error.message };
+    }
+  }
 }
 
-// Export singleton instance as default and class for flexibility
+/**
+ * Create and export singleton instance
+ */
+function createSessionService() {
+  return new SessionService();
+}
+
+// Create singleton instance
+const sessionService = createSessionService();
+
 export default sessionService;
 export { SessionService };
