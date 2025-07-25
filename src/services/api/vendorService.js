@@ -17,9 +17,9 @@ class VendorService {
         throw new Error('Email and password are required');
       }
 
-      const vendor = this.vendors.find(v => 
+const vendor = this.vendors.find(v => 
         v.email?.toLowerCase() === credentials.email.toLowerCase() && 
-        v.status === 'active'
+        v.isActive === true
       );
 
       if (!vendor) {
@@ -27,7 +27,7 @@ class VendorService {
       }
 
       // In a real app, you'd verify the password hash
-      if (credentials.password !== 'vendor123') {
+      if (credentials.password !== vendor.password) {
         throw new Error('Invalid credentials');
       }
 

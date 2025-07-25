@@ -222,8 +222,8 @@ const VendorDashboard = ({ vendor, onLogout, onProfileUpdate }) => {
     setError(null);
 try {
       const [vendorProducts, vendorStats] = await Promise.all([
-        productService.getVendorProducts(vendor.Id),
-        productService.getVendorStats(vendor.Id)
+        productService.getVendorProducts(vendor.id),
+        productService.getVendorStats(vendor.id)
       ]);
       
       setProducts(vendorProducts);
@@ -287,7 +287,7 @@ try {
 
   const handleProductUpdate = async (productId, priceData) => {
     try {
-      const updatedProduct = await productService.updateVendorPrice(vendor.Id, productId, priceData);
+const updatedProduct = await productService.updateVendorPrice(vendor.id, productId, priceData);
       
       setProducts(prev => 
         prev.map(product => 
@@ -298,7 +298,7 @@ try {
       toast.success('Product price updated successfully');
       
       // Reload stats
-      const newStats = await productService.getVendorStats(vendor.Id);
+const newStats = await productService.getVendorStats(vendor.id);
       setStats(newStats);
     } catch (error) {
       toast.error(error.message);
@@ -751,7 +751,7 @@ const EditPriceModal = ({ product, vendor, onSave, onClose }) => {
         type: 'price_stock_change',
         title: `Price/Stock Update - ${product.name}`,
         description: `Update price from Rs. ${product.price} to Rs. ${formData.price} and stock from ${product.stock} to ${formData.stock}`,
-        submittedBy: `vendor_${vendor.Id}`,
+submittedBy: `vendor_${vendor.id}`,
         affectedEntity: {
           entityType: 'product',
           entityId: product.id,
@@ -767,7 +767,7 @@ const EditPriceModal = ({ product, vendor, onSave, onClose }) => {
             purchasePrice: formData.purchasePrice
           }
         },
-        vendorId: vendor.Id,
+vendorId: vendor.id,
         productId: product.id
       };
       
@@ -1059,7 +1059,7 @@ const VendorProfileTab = ({ vendor, onProfileUpdate }) => {
     setLoading(true);
     
     try {
-      const updatedProfile = await vendorService.updateVendorProfile(vendor.Id, formData);
+const updatedProfile = await vendorService.updateVendorProfile(vendor.id, formData);
       onProfileUpdate(updatedProfile);
       setIsEditing(false);
       toast.success('Profile updated successfully');
@@ -1251,8 +1251,8 @@ const VendorAvailabilityTab = ({ vendor }) => {
     
     try {
       const pendingOrders = await orderService.getPendingAvailabilityRequests();
-      const vendorOrders = pendingOrders.filter(order => {
-        return order.items?.some(item => (item.productId % 3 + 1) === vendor.Id);
+const vendorOrders = pendingOrders.filter(order => {
+        return order.items?.some(item => (item.productId % 3 + 1) === vendor.id);
       });
       setOrders(vendorOrders);
     } catch (error) {
@@ -1266,7 +1266,7 @@ const VendorAvailabilityTab = ({ vendor }) => {
 
   const handleAvailabilityUpdate = async (orderId, productId, available, notes = '') => {
     try {
-      await orderService.updateVendorAvailability(orderId, vendor.Id, productId, {
+await orderService.updateVendorAvailability(orderId, vendor.id, productId, {
         available,
         notes,
         timestamp: new Date().toISOString(),
@@ -1290,10 +1290,10 @@ const VendorAvailabilityTab = ({ vendor }) => {
       setLoading(true);
       const updatePromises = selectedOrders.map(orderId => {
         const order = orders.find(o => o.id === orderId);
-        const vendorProducts = order.items.filter(item => (item.productId % 3 + 1) === vendor.Id);
+const vendorProducts = order.items.filter(item => (item.productId % 3 + 1) === vendor.id);
         
         return Promise.all(vendorProducts.map(item => 
-          orderService.updateVendorAvailability(orderId, vendor.Id, item.productId, {
+orderService.updateVendorAvailability(orderId, vendor.id, item.productId, {
             available: bulkAvailability,
             notes: `Bulk ${bulkAvailability ? 'confirmed' : 'declined'} availability`,
             timestamp: new Date().toISOString()
@@ -1334,7 +1334,7 @@ const VendorAvailabilityTab = ({ vendor }) => {
 
   const getAvailabilityStatus = (order, productId) => {
     if (!order.vendor_availability) return 'pending';
-    const key = `${productId}_${vendor.Id}`;
+const key = `${productId}_${vendor.id}`;
     const availability = order.vendor_availability[key];
     
     if (!availability) return 'pending';
@@ -1417,7 +1417,7 @@ const VendorAvailabilityTab = ({ vendor }) => {
       <div className="space-y-4">
         {filteredOrders.map((order) => {
           const deadline = getDeadlineStatus(order.createdAt);
-          const vendorProducts = order.items?.filter(item => (item.productId % 3 + 1) === vendor.Id) || [];
+const vendorProducts = order.items?.filter(item => (item.productId % 3 + 1) === vendor.id) || [];
           
           return (
             <div key={order.id} className="bg-white rounded-lg shadow-sm border overflow-hidden">
@@ -1582,7 +1582,7 @@ const VendorPackingTab = ({ vendor }) => {
     setError(null);
     
     try {
-      const fulfillmentOrders = await orderService.getFulfillmentOrders(vendor.Id);
+const fulfillmentOrders = await orderService.getFulfillmentOrders(vendor.id);
       // Filter orders ready for packing (availability confirmed)
       const packingOrders = fulfillmentOrders.filter(order => 
         order.fulfillment_stage === 'availability_confirmed' || order.fulfillment_stage === 'packed'
@@ -1601,7 +1601,7 @@ const VendorPackingTab = ({ vendor }) => {
     setSelectedOrder(order);
     setPackingData({
       orderId: order.id,
-      items: order.items?.filter(item => (item.productId % 3 + 1) === vendor.Id).map(item => ({
+items: order.items?.filter(item => (item.productId % 3 + 1) === vendor.id).map(item => ({
         ...item,
         packedQuantity: item.quantity,
         actualWeight: '',
@@ -1645,8 +1645,8 @@ const VendorPackingTab = ({ vendor }) => {
     try {
       const packingInfo = {
         packingTimestamp: new Date().toISOString(),
-        vendorId: vendor.Id,
-        packedItems: packingData.items,
+packingTimestamp: new Date().toISOString(),
+        vendorId: vendor.id,
         totalWeight: packingData.items.reduce((sum, item) => sum + (parseFloat(item.actualWeight) || 0), 0),
         photo: photoCapture,
         qualityChecked: true
@@ -1704,7 +1704,7 @@ const VendorPackingTab = ({ vendor }) => {
       {/* Orders List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredOrders.map((order) => {
-          const vendorItems = order.items?.filter(item => (item.productId % 3 + 1) === vendor.Id) || [];
+const vendorItems = order.items?.filter(item => (item.productId % 3 + 1) === vendor.id) || [];
           const isPacked = order.fulfillment_stage === 'packed';
           
           return (
@@ -1910,7 +1910,7 @@ const VendorOrdersTab = ({ vendor }) => {
     setError(null);
     
     try {
-      const vendorOrders = await orderService.getVendorOrders(vendor.Id);
+const vendorOrders = await orderService.getVendorOrders(vendor.id);
       setOrders(vendorOrders);
     } catch (error) {
       console.error('Error loading vendor orders:', error);
@@ -1923,7 +1923,7 @@ const VendorOrdersTab = ({ vendor }) => {
 
   const handleAvailabilityUpdate = async (orderId, productId, available, notes = '') => {
     try {
-      await orderService.updateVendorAvailability(orderId, vendor.Id, productId, {
+await orderService.updateVendorAvailability(orderId, vendor.id, productId, {
         available,
         notes,
         timestamp: new Date().toISOString()
@@ -1951,7 +1951,7 @@ const VendorOrdersTab = ({ vendor }) => {
 
   const getAvailabilityStatus = (order, productId) => {
     if (!order.vendor_availability) return 'pending';
-    const key = `${productId}_${vendor.Id}`;
+const key = `${productId}_${vendor.id}`;
     const availability = order.vendor_availability[key];
     
     if (!availability) return 'pending';
@@ -2012,7 +2012,7 @@ const VendorOrdersTab = ({ vendor }) => {
               <div className="space-y-3">
                 {order.items?.filter(item => 
                   // Filter items assigned to this vendor (simplified logic)
-                  item.productId % 3 + 1 === vendor.Id
+item.productId % 3 + 1 === vendor.id
                 ).map((item) => (
                   <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
@@ -2121,7 +2121,7 @@ const VendorFulfillmentTab = ({ vendor }) => {
     setError(null);
     
     try {
-      const fulfillmentOrders = await orderService.getFulfillmentOrders(vendor.Id);
+const fulfillmentOrders = await orderService.getFulfillmentOrders(vendor.id);
       setOrders(fulfillmentOrders);
     } catch (error) {
       console.error('Error loading fulfillment orders:', error);
@@ -2171,8 +2171,8 @@ const VendorFulfillmentTab = ({ vendor }) => {
     try {
       await orderService.confirmHandover(selectedOrder.id, {
         signature: signatureData,
-        vendorId: vendor.Id,
-        timestamp: new Date().toISOString()
+signature: signatureData,
+        vendorId: vendor.id,
       });
       
       setShowSignatureModal(false);
@@ -2298,7 +2298,7 @@ const VendorFulfillmentTab = ({ vendor }) => {
                 <div className="mb-4">
                   <div className="space-y-2">
                     {order.items?.filter(item => 
-                      (item.productId % 3 + 1) === vendor.Id
+(item.productId % 3 + 1) === vendor.id
                     ).map((item) => (
                       <div key={item.productId} className="flex items-center justify-between p-2 bg-white rounded border">
                         <div>
