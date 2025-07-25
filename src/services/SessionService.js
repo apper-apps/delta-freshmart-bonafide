@@ -1,5 +1,5 @@
-import React from "react";
-import Error from "@/components/ui/Error";
+// SessionService - Pure JavaScript service for session management
+// No React dependencies - services should be framework-agnostic
 /**
  * SessionService - Comprehensive session management for the application
  * Handles user authentication, session persistence, and state management
