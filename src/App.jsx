@@ -275,6 +275,7 @@ const OrderTracking = createLazyComponent(() => import('@/components/pages/Order
 const Account = createLazyComponent(() => import('@/components/pages/Account'), 'Account');
 const VendorPortal = createLazyComponent(() => import('@/components/pages/VendorPortal'), 'Vendor Portal');
 const RoleAssignment = createLazyComponent(() => import('@/components/pages/RoleAssignment'), 'Role Assignment');
+
 // WebSocket Integration Component
 const WebSocketProvider = ({ children }) => {
   const dispatch = useDispatch();
