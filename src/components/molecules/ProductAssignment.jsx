@@ -7,6 +7,7 @@ import { Badge } from '@/components/atoms/Badge';
 import Loading from '@/components/ui/Loading';
 import Error from '@/components/ui/Error';
 import { productService } from '@/services/api/productService';
+import { vendorService } from '@/services/api/vendorService';
 
 const ProductAssignment = ({ 
   vendor, 
@@ -50,7 +51,7 @@ const ProductAssignment = ({
   const loadExistingAssignments = async () => {
     try {
       // Get existing assignments for this vendor
-      const vendorProducts = await productService.getVendorProducts(vendor.Id);
+const vendorProducts = await vendorService.getVendorProducts(vendor.Id);
       const assignedIds = vendorProducts.map(p => p.id);
       setSelectedProductIds(assignedIds);
     } catch (err) {
@@ -99,7 +100,7 @@ const ProductAssignment = ({
 
     setAssignmentLoading(true);
     try {
-      await productService.assignProductsToVendor(vendor.Id, selectedProductIds);
+await vendorService.assignProductsToVendor(vendor.Id, selectedProductIds);
       toast.success(`Successfully assigned ${selectedProductIds.length} products to ${vendor.name}`);
       onAssign?.(selectedProductIds);
     } catch (err) {

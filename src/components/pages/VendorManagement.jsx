@@ -124,7 +124,7 @@ const handleEdit = async (vendor) => {
     
     // Load existing product assignments for this vendor
     try {
-      const vendorProducts = await productService.getVendorProducts(vendor.Id);
+const vendorProducts = await vendorService.getVendorProducts(vendor.Id);
       const assignedProductIds = vendorProducts.map(p => p.id);
       setSelectedProducts(assignedProductIds);
     } catch (err) {
@@ -150,8 +150,8 @@ const handleSubmit = async (e) => {
         vendorResult = await vendorService.update(editingVendor.Id, updateData);
         
         // Update product assignments if changed
-        if (selectedProducts.length > 0) {
-          await productService.assignProductsToVendor(editingVendor.Id, selectedProducts);
+if (selectedProducts.length > 0) {
+          await vendorService.assignProductsToVendor(editingVendor.Id, selectedProducts);
         }
         
         toast.success('Vendor updated successfully');
@@ -160,8 +160,8 @@ const handleSubmit = async (e) => {
         vendorResult = await vendorService.create(formData);
         
         // Assign products to new vendor if any selected
-        if (selectedProducts.length > 0) {
-          await productService.assignProductsToVendor(vendorResult.Id, selectedProducts);
+if (selectedProducts.length > 0) {
+          await vendorService.assignProductsToVendor(vendorResult.Id, selectedProducts);
         }
         
         toast.success('Vendor created successfully');

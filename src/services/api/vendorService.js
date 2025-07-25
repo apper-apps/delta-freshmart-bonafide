@@ -1,6 +1,5 @@
-import React from "react";
 import vendorsData from "@/services/mockData/vendors.json";
-import Error from "@/components/ui/Error";
+import productsData from "@/services/mockData/products.json";
 
 class VendorService {
   constructor() {
@@ -453,9 +452,82 @@ isValidEmail(email) {
     const phoneRegex = /^[+]?[\d\s\-()]{10,}$/;
     return phoneRegex.test(phone);
   }
-
-  async delay(ms = 200) {
+async delay(ms = 200) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Get products associated with a specific vendor
+  async getVendorProducts(vendorId) {
+    await this.delay(300);
+    
+    if (!vendorId) {
+      throw new Error('Vendor ID is required');
+    }
+
+    try {
+      // Import products data
+      const products = productsData || [];
+      
+      // Filter products by vendor ID
+      const vendorProducts = products.filter(product => 
+        product.vendorId === parseInt(vendorId) || 
+        product.vendor === parseInt(vendorId) ||
+        (product.supplier && product.supplier.id === parseInt(vendorId))
+      );
+
+      // Ensure consistent product structure
+      return vendorProducts.map(product => ({
+        id: product.id,
+        name: product.name || product.title,
+        price: product.price || 0,
+        cost: product.cost || product.wholesalePrice || 0,
+        stock: product.stock || product.quantity || 0,
+        category: product.category,
+        description: product.description,
+        image: product.image || product.imageUrl,
+        vendorId: parseInt(vendorId),
+        isActive: product.isActive !== false,
+        sku: product.sku || `SKU-${product.id}`,
+        lastUpdated: product.lastUpdated || new Date().toISOString()
+      }));
+    } catch (error) {
+      console.error('Error fetching vendor products:', error);
+      throw new Error(`Failed to load vendor products: ${error.message}`);
+    }
+  }
+
+  // Assign products to vendor
+  async assignProductsToVendor(vendorId, productIds) {
+    await this.delay(400);
+    
+    if (!vendorId || !Array.isArray(productIds)) {
+      throw new Error('Vendor ID and product IDs array are required');
+    }
+
+    try {
+      // In a real implementation, this would update the database
+      // For now, we'll simulate the assignment
+      const vendor = this.vendors.find(v => v.Id === parseInt(vendorId));
+      
+      if (!vendor) {
+        throw new Error('Vendor not found');
+      }
+
+      // Simulate assignment success
+      const assignmentResult = {
+        vendorId: parseInt(vendorId),
+        vendorName: vendor.name,
+        assignedProducts: productIds.length,
+        assignedAt: new Date().toISOString(),
+        success: true
+      };
+
+      console.log('Products assigned to vendor:', assignmentResult);
+      return assignmentResult;
+    } catch (error) {
+      console.error('Error assigning products to vendor:', error);
+      throw new Error(`Failed to assign products: ${error.message}`);
+    }
   }
 
   // Admin control functions
