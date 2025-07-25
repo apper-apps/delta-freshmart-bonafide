@@ -1,3 +1,5 @@
+import React from "react";
+import Error from "@/components/ui/Error";
 /**
  * SessionService - Comprehensive session management for the application
  * Handles user authentication, session persistence, and state management
@@ -659,9 +661,36 @@ class SessionService {
 // Create singleton instance with improved error handling
 function createSessionService() {
   try {
-    return new SessionService();
+    // Ensure SessionService class is properly referenced
+    if (typeof SessionService === 'undefined') {
+      throw new Error('SessionService class is not defined');
+    }
+    
+    if (typeof SessionService !== 'function') {
+      throw new Error('SessionService is not a constructor function');
+    }
+    
+    // Create new instance with proper error handling
+    const serviceInstance = new SessionService();
+    
+    // Validate the instance has required methods
+    const requiredMethods = [
+      'getCurrentSession', 'isAuthenticated', 'getCurrentUser', 'getToken',
+      'createSession', 'validateSession', 'clearSession', 'refreshSession',
+      'updateUser', 'createGuestSession', 'getSessionInfo', 'addListener', 'removeListener'
+    ];
+    
+    for (const method of requiredMethods) {
+      if (typeof serviceInstance[method] !== 'function') {
+        throw new Error(`SessionService instance missing required method: ${method}`);
+      }
+    }
+    
+    return serviceInstance;
   } catch (error) {
     console.error('Failed to initialize SessionService:', error);
+    console.error('SessionService constructor type:', typeof SessionService);
+    console.error('Available SessionService properties:', SessionService ? Object.getOwnPropertyNames(SessionService) : 'undefined');
     
     // Create robust fallback service that matches the interface
     return {
@@ -737,11 +766,51 @@ try {
     throw new Error('createSessionService is not defined or not a function');
   }
   
-  sessionService = createSessionService();
-  
-  // Validate the created service has required methods
-  if (!sessionService || typeof sessionService !== 'object') {
-    throw new Error('SessionService creation failed - invalid service object');
+  try {
+    sessionService = createSessionService();
+    
+    // Validate the created service has required methods
+    if (!sessionService || typeof sessionService !== 'object') {
+      throw new Error('SessionService creation failed - invalid service object');
+    }
+    
+    // Additional validation for critical methods
+    const criticalMethods = ['getCurrentSession', 'isAuthenticated', 'createSession'];
+    for (const method of criticalMethods) {
+      if (typeof sessionService[method] !== 'function') {
+        console.warn(`SessionService missing critical method: ${method}`);
+      }
+    }
+    
+    console.log('SessionService initialized successfully:', {
+      isFallback: !!sessionService.isFallback,
+      initialized: !!sessionService.initialized,
+      hasError: !!sessionService.error
+    });
+    
+  } catch (initError) {
+    console.error('Critical error during SessionService initialization:', initError);
+    
+    // Create emergency fallback
+    sessionService = {
+      getCurrentSession: async () => null,
+      isAuthenticated: async () => false,
+      getCurrentUser: async () => null,
+      getToken: async () => null,
+      createSession: async () => null,
+      validateSession: async () => false,
+      clearSession: () => {},
+      refreshSession: async () => null,
+      updateUser: async () => null,
+      createGuestSession: async () => null,
+      getSessionInfo: async () => ({}),
+      addListener: () => {},
+      removeListener: () => {},
+      initialized: false,
+      error: initError.message,
+      isFallback: true,
+      isEmergencyFallback: true
+    };
   }
   
 } catch (error) {
