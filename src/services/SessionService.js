@@ -659,7 +659,28 @@ class SessionService {
   }
 }
 // Create and export singleton instance
-const sessionService = new SessionService();
+let sessionService;
+try {
+  sessionService = new SessionService();
+} catch (error) {
+  console.error('Failed to initialize SessionService:', error);
+  // Create a fallback service to prevent app crashes
+  sessionService = {
+    async getCurrentSession() { return null; },
+    async createSession() { return null; },
+    async validateSession() { return false; },
+    async isAuthenticated() { return false; },
+    async getCurrentUser() { return null; },
+    async getToken() { return null; },
+    clearSession() {},
+    async refreshSession() { return null; },
+    async updateUser() { return null; },
+    async getSessionInfo() { return null; },
+    addListener() {},
+    removeListener() {},
+    notifyListeners() {}
+  };
+}
 
 export { SessionService };
 export default sessionService;
