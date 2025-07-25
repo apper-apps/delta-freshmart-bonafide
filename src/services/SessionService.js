@@ -633,8 +633,10 @@ class SessionService {
   }
 }
 
-// Create service instance
-// Create service instance
+// Export the class first
+export { SessionService };
+
+// Create instance after class export
 const sessionService = new SessionService();
 
 // Export individual methods for backward compatibility
@@ -653,5 +655,5 @@ export const {
   createGuestSession
 } = sessionService;
 
-// Export service instance as default
+// Default export
 export default sessionService;
