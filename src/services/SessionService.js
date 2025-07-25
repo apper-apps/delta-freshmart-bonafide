@@ -656,9 +656,28 @@ async validateSession(session = null) {
     }
   }
 }
+
 // Create singleton instance with improved error handling
 let sessionService;
 
+try {
+  sessionService = createSessionService();
+} catch (error) {
+  console.error('Failed to initialize SessionService:', error);
+  // Create a minimal fallback service to prevent app crashes
+  sessionService = {
+    getCurrentSession: async () => null,
+    isAuthenticated: async () => false,
+    getCurrentUser: async () => null,
+    getToken: async () => null,
+    createSession: async () => null,
+    validateSession: async () => false,
+    clearSession: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    getSessionInfo: async () => ({ user: null, permissions: [] })
+  };
+}
 // Safe singleton creation
 function createSessionService() {
   try {
