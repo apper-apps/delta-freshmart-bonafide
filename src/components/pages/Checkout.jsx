@@ -37,12 +37,28 @@ function Checkout() {
   const [transactionId, setTransactionId] = useState('');
 const [errors, setErrors] = useState({});
 
-  // Calculate totals with validated pricing and deals
+// Calculate totals with validated pricing and deals
   const calculateCartTotals = () => {
+    // Safety check for undefined/null cart
+    if (!cart || !Array.isArray(cart) || cart.length === 0) {
+      return {
+        originalSubtotal: 0,
+        dealSavings: 0,
+        subtotal: 0,
+        deliveryCharge: 0,
+        total: 0
+      };
+    }
+
     let subtotal = 0;
     let totalSavings = 0;
     
     cart.forEach(item => {
+      // Ensure item has required properties
+      if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number') {
+        return; // Skip invalid items
+      }
+
       const itemTotal = item.price * item.quantity;
       subtotal += itemTotal;
       
@@ -52,11 +68,15 @@ const [errors, setErrors] = useState({});
           const freeItems = Math.floor(item.quantity / 2);
           totalSavings += freeItems * item.price;
         } else if (item.dealType === 'Bundle' && item.quantity >= 3) {
-          const [buyQty, payQty] = item.dealValue.split('for').map(x => parseInt(x.trim()));
-          if (buyQty && payQty && item.quantity >= buyQty) {
-            const bundleSets = Math.floor(item.quantity / buyQty);
-            const freeItems = bundleSets * (buyQty - payQty);
-            totalSavings += freeItems * item.price;
+          const dealParts = item.dealValue.split('for');
+          if (dealParts.length === 2) {
+            const buyQty = parseInt(dealParts[0].trim());
+            const payQty = parseInt(dealParts[1].trim());
+            if (buyQty && payQty && item.quantity >= buyQty) {
+              const bundleSets = Math.floor(item.quantity / buyQty);
+              const freeItems = bundleSets * (buyQty - payQty);
+              totalSavings += freeItems * item.price;
+            }
           }
         }
       }
@@ -73,11 +93,12 @@ const [errors, setErrors] = useState({});
       total: discountedSubtotal + deliveryCharge + calculateGatewayFee(discountedSubtotal)
     };
   };
-
+// Calculate totals after cart is available
   const totals = calculateCartTotals();
   const { originalSubtotal, dealSavings, subtotal, deliveryCharge, total } = totals;
   const gatewayFee = calculateGatewayFee(subtotal);
-useEffect(() => {
+
+  useEffect(() => {
     loadPaymentMethods();
   }, []);
   async function loadPaymentMethods() {
@@ -98,13 +119,16 @@ useEffect(() => {
 }
   }
 
-  function calculateGatewayFee(currentSubtotal = 0) {
+function calculateGatewayFee(currentSubtotal = 0) {
+    // Safety checks for undefined arrays and payment method
+    if (!Array.isArray(availablePaymentMethods) || !paymentMethod) return 0;
+    
     const selectedMethod = availablePaymentMethods.find(method => method?.id === paymentMethod);
-    if (!selectedMethod || !selectedMethod.fee) return 0;
+    if (!selectedMethod || !selectedMethod.fee || typeof selectedMethod.fee === 'undefined') return 0;
     
     const feeAmount = typeof selectedMethod.fee === 'number' 
       ? selectedMethod.fee * currentSubtotal 
-      : selectedMethod.fee;
+      : parseFloat(selectedMethod.fee) || 0;
     
     return Math.max(feeAmount, selectedMethod.minimumFee || 0);
   }
@@ -552,28 +576,32 @@ const order = await orderService.create(orderData);
           <div className="order-2 lg:order-1">
             <div className="card p-6 mb-6">
               <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
-              <div className="space-y-4">
-                {cart.map(item => (
-                  <div key={item.id} className="flex items-center justify-between py-2 border-b">
+<div className="space-y-4">
+                {cart && Array.isArray(cart) ? cart.map(item => (
+                  <div key={item?.id || Math.random()} className="flex items-center justify-between py-2 border-b">
                     <div className="flex items-center">
                       <img 
-                        src={item.image || item.imageUrl || '/placeholder-image.jpg'} 
-                        alt={item.name}
+                        src={item?.image || item?.imageUrl || '/placeholder-image.jpg'} 
+                        alt={item?.name || 'Product'}
                         className="w-12 h-12 object-cover rounded mr-3"
                         onError={(e) => {
                           e.target.src = '/placeholder-image.jpg';
                         }}
                       />
                       <div>
-                        <h3 className="font-medium">{item.name}</h3>
-                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                        <h3 className="font-medium">{item?.name || 'Unknown Product'}</h3>
+                        <p className="text-sm text-gray-600">Qty: {item?.quantity || 0}</p>
                       </div>
                     </div>
                     <span className="font-semibold">
-                      Rs. {(item.price * item.quantity).toLocaleString()}
-</span>
+                      Rs. {((item?.price || 0) * (item?.quantity || 0)).toLocaleString()}
+                    </span>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No items in cart
+                  </div>
+                )}
                 <div className="border-t pt-4 space-y-2">
                   <div className="flex justify-between">
                     <span>Original Subtotal:</span>
