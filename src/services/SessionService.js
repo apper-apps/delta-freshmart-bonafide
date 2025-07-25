@@ -200,33 +200,58 @@ constructor() {
     }
   }
 
-  validateSessionData(session) {
+validateSessionData(session) {
     try {
-      if (!session || typeof session !== 'object') {
+      // Enhanced null/undefined checks
+      if (!session || typeof session !== 'object' || session === null) {
+        console.log('SessionService: Session is null, undefined, or not an object');
         return false;
       }
 
       const requiredFields = ['id', 'sessionId', 'user', 'createdAt'];
-      const hasRequiredFields = requiredFields.every(field => session.hasOwnProperty(field));
+      const hasRequiredFields = requiredFields.every(field => {
+        const hasField = session.hasOwnProperty(field) && session[field] !== null && session[field] !== undefined;
+        if (!hasField) {
+          console.log(`SessionService: Session missing required field: ${field}`);
+        }
+        return hasField;
+      });
       
       if (!hasRequiredFields) {
-        console.warn('SessionService: Session missing required fields');
+        console.warn('SessionService: Session missing required fields', { 
+          sessionKeys: Object.keys(session || {}),
+          requiredFields 
+        });
         return false;
       }
 
-      if (!session.user || typeof session.user !== 'object') {
-        console.warn('SessionService: Session user data invalid');
+      // Enhanced user data validation
+      if (!session.user || typeof session.user !== 'object' || session.user === null) {
+        console.warn('SessionService: Session user data invalid', { 
+          userType: typeof session.user,
+          userValue: session.user 
+        });
         return false;
       }
 
       const requiredUserFields = ['id', 'username', 'role'];
-      const hasRequiredUserFields = requiredUserFields.every(field => session.user.hasOwnProperty(field));
+      const hasRequiredUserFields = requiredUserFields.every(field => {
+        const hasField = session.user.hasOwnProperty(field) && session.user[field] !== null && session.user[field] !== undefined;
+        if (!hasField) {
+          console.log(`SessionService: Session user missing required field: ${field}`);
+        }
+        return hasField;
+      });
       
       if (!hasRequiredUserFields) {
-        console.warn('SessionService: Session user missing required fields');
+        console.warn('SessionService: Session user missing required fields', {
+          userKeys: Object.keys(session.user || {}),
+          requiredUserFields
+        });
         return false;
       }
 
+      console.log('SessionService: Session validation successful');
       return true;
     } catch (error) {
       console.error('SessionService: Error validating session data:', error);
@@ -236,18 +261,37 @@ constructor() {
 
   isSessionExpired(session) {
     try {
-      if (!session || !session.expiresAt) {
+      // Enhanced session existence check
+      if (!session || typeof session !== 'object' || session === null) {
+        console.log('SessionService: Cannot check expiration - session is null or invalid');
         return true;
       }
 
+      if (!session.expiresAt) {
+        console.log('SessionService: Cannot check expiration - no expiresAt field');
+        return true;
+      }
+
+      // Validate expiresAt format
       const expirationTime = new Date(session.expiresAt).getTime();
+      if (isNaN(expirationTime)) {
+        console.warn('SessionService: Invalid expiresAt format:', session.expiresAt);
+        return true;
+      }
+
       const currentTime = Date.now();
       const isExpired = currentTime >= expirationTime;
 
       if (isExpired) {
         console.log('SessionService: Session expired', {
           expiresAt: session.expiresAt,
-          currentTime: new Date(currentTime).toISOString()
+          currentTime: new Date(currentTime).toISOString(),
+          timeUntilExpiry: expirationTime - currentTime
+        });
+      } else {
+        console.log('SessionService: Session is valid', {
+          expiresAt: session.expiresAt,
+          timeUntilExpiry: expirationTime - currentTime
         });
       }
 
@@ -453,37 +497,98 @@ constructor() {
    */
   async getCurrentSession() {
     try {
-      // Return current session if available
-      if (this.currentSession && typeof this.currentSession === 'object') {
-        return this.currentSession;
+      console.log('SessionService: Getting current session...');
+      
+      // Enhanced current session validation
+      if (this.currentSession && typeof this.currentSession === 'object' && this.currentSession !== null) {
+        console.log('SessionService: Found current session in memory');
+        
+        // Validate current session before returning
+        if (this.validateSessionData(this.currentSession) && !this.isSessionExpired(this.currentSession)) {
+          console.log('SessionService: Current session is valid');
+          return this.currentSession;
+        } else {
+          console.log('SessionService: Current session in memory is invalid or expired, clearing...');
+          this.currentSession = null;
+        }
       }
 
-      // Try to load from storage
+      // Try to load from storage with enhanced validation
+      console.log('SessionService: Attempting to load session from storage...');
       const storedSession = this.getStoredSession();
-      if (storedSession && this.validateSessionData(storedSession)) {
-        this.currentSession = storedSession;
-        return storedSession;
+      
+      if (storedSession && typeof storedSession === 'object' && storedSession !== null) {
+        console.log('SessionService: Found stored session, validating...');
+        
+        if (this.validateSessionData(storedSession) && !this.isSessionExpired(storedSession)) {
+          console.log('SessionService: Stored session is valid, restoring to memory');
+          this.currentSession = storedSession;
+          return storedSession;
+        } else {
+          console.log('SessionService: Stored session is invalid or expired, clearing storage...');
+          this.clearStoredSession();
+        }
+      } else {
+        console.log('SessionService: No stored session found or session is invalid');
       }
 
       // Create guest session as fallback if no valid session exists
-      console.log('SessionService: No valid session found, creating guest session');
+      console.log('SessionService: No valid session found, attempting to create guest session...');
       try {
-        return await this.createGuestSession();
+        const guestSession = await this.createGuestSession();
+        if (guestSession && typeof guestSession === 'object') {
+          console.log('SessionService: Guest session created successfully');
+          return guestSession;
+        } else {
+          console.error('SessionService: Guest session creation returned invalid result');
+          return null;
+        }
       } catch (guestError) {
         console.error('SessionService: Failed to create guest session in getCurrentSession:', guestError);
         return null;
       }
     } catch (error) {
-      console.error('SessionService: Error in getCurrentSession:', error);
-      // Clear potentially corrupted session
-      this.currentSession = null;
+      console.error('SessionService: Critical error in getCurrentSession:', error);
       
-      // Try to create fallback session
+      // Clear potentially corrupted session data
       try {
-        return await this.createGuestSession();
+        this.currentSession = null;
+        this.clearStoredSession();
+        console.log('SessionService: Cleared corrupted session data');
+      } catch (clearError) {
+        console.error('SessionService: Failed to clear corrupted session:', clearError);
+      }
+      
+      // Final attempt to create fallback session
+      try {
+        console.log('SessionService: Making final attempt to create fallback session...');
+        const fallbackSession = await this.createGuestSession();
+        if (fallbackSession && typeof fallbackSession === 'object') {
+          console.log('SessionService: Fallback session created successfully');
+          return fallbackSession;
+        } else {
+          console.error('SessionService: Fallback session creation failed');
+          return null;
+        }
       } catch (fallbackError) {
-        console.error('SessionService: All fallback methods failed:', fallbackError);
-        return null;
+        console.error('SessionService: All session recovery methods failed:', fallbackError);
+        
+        // Return minimal session object to prevent application crashes
+        const emergencySession = {
+          id: 'emergency-' + Date.now(),
+          sessionId: 'emergency-session',
+          user: {
+            id: 'guest',
+            username: 'Guest User',
+            role: 'guest'
+          },
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+          isEmergencySession: true
+        };
+        
+        console.warn('SessionService: Created emergency session to prevent app crash');
+        return emergencySession;
       }
     }
   }
