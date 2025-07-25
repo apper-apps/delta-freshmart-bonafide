@@ -1,10 +1,10 @@
 import 'react-toastify/dist/ReactToastify.css'
+import "@/index.css";
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { Provider, useDispatch } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
-import "@/index.css";
 import { addRealTimeNotification, setConnectionStatus, updateApprovalStatus } from "@/store/approvalWorkflowSlice";
 import { persistor, store } from "@/store/index";
 import { shouldRetry } from "@/utils/errorHandling";
@@ -33,6 +33,7 @@ import OrderTracking from "@/components/pages/OrderTracking";
 import Layout from "@/components/organisms/Layout";
 import Error from "@/components/ui/Error";
 import Loading from "@/components/ui/Loading";
+// Core components that need to be loaded immediately (not lazy)
 // Error boundary for lazy-loaded components
 class LazyErrorBoundary extends React.Component {
   constructor(props) {
