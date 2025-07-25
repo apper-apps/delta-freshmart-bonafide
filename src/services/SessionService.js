@@ -14,8 +14,8 @@ class SessionService {
     // Initialize session on service creation
     this.initializeSession();
   }
-
-* Initialize session service and validate existing session
+/**
+   * Initialize session service and validate existing session
    */
   initializeSession() {
     try {
