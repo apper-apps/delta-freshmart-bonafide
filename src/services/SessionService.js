@@ -631,8 +631,11 @@ const sessionToValidate = session || this.currentSession;
     }
   }
 }
+// Create singleton instance
+const sessionService = new SessionService();
 
-// Export the class first
+// Export singleton instance as default and class for flexibility
+export default sessionService;
 export { SessionService };
 
 // Create instance with error handling
