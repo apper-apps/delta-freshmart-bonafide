@@ -557,12 +557,10 @@ class VendorService {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
-
-  isValidPhone(phone) {
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-    return phoneRegex.test(phone.replace(/[-\s\(\)]/g, ''));
+isValidPhone(phone) {
+    const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+    return phoneRegex.test(phone.replace(/[-\s()]/g, ''));
   }
-
   async delay(ms = 200) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
