@@ -658,27 +658,6 @@ async validateSession(session = null) {
 }
 
 // Create singleton instance with improved error handling
-let sessionService;
-
-try {
-  sessionService = createSessionService();
-} catch (error) {
-  console.error('Failed to initialize SessionService:', error);
-  // Create a minimal fallback service to prevent app crashes
-  sessionService = {
-    getCurrentSession: async () => null,
-    isAuthenticated: async () => false,
-    getCurrentUser: async () => null,
-    getToken: async () => null,
-    createSession: async () => null,
-    validateSession: async () => false,
-    clearSession: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    getSessionInfo: async () => ({ user: null, permissions: [] })
-  };
-}
-// Safe singleton creation
 function createSessionService() {
   try {
     return new SessionService();
@@ -725,6 +704,10 @@ function createSessionService() {
         console.warn('SessionService: Using fallback updateUser');
         return null;
       },
+      createGuestSession: async () => {
+        console.warn('SessionService: Using fallback createGuestSession');
+        return null;
+      },
       
       // Utility methods
       getSessionInfo: async () => {
@@ -745,10 +728,33 @@ function createSessionService() {
     };
   }
 }
-// Singleton is already initialized above with proper error handling
-// DO NOT add duplicate initialization here - it causes constructor errors
-// The sessionService is initialized at lines 661-680 with try-catch and fallback
 
+let sessionService;
+
+try {
+  sessionService = createSessionService();
+} catch (error) {
+  console.error('Failed to initialize SessionService:', error);
+  // Create a minimal fallback service to prevent app crashes
+  sessionService = {
+    getCurrentSession: async () => null,
+    isAuthenticated: async () => false,
+    getCurrentUser: async () => null,
+    getToken: async () => null,
+    createSession: async () => null,
+    validateSession: async () => false,
+    clearSession: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    getSessionInfo: async () => ({ user: null, permissions: [] }),
+    createGuestSession: async () => null,
+    initialized: false,
+    error: error.message,
+    isFallback: true
+  };
+}
+// Singleton is already initialized above with proper error handling
+// Export the singleton instance and class
 // Validate singleton before export
 if (!sessionService) {
   console.error('SessionService failed to initialize - using minimal fallback');
