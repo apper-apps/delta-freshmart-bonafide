@@ -1,4 +1,6 @@
+import React from "react";
 import productsData from "@/services/mockData/products.json";
+import Error from "@/components/ui/Error";
 class ProductService {
   constructor() {
     this.products = [...productsData];
@@ -1197,12 +1199,124 @@ url: `https://via.placeholder.com/600x600/2196F3/ffffff?text=AI+Generated+${enco
           currentValue: basePrice
         });
       }
+}
+  }
 
-      if (basePrice > 1000000) {
-        conflicts.push({
-          type: 'excessive_base_price',
-          details: 'Base price exceeds maximum allowed value (Rs. 1,000,000)',
-          field: 'basePrice',
+  // Validate offer conflicts with existing pricing and discounts
+  async validateOfferConflicts(productData, offerData = null) {
+    try {
+      await this.delay(150);
+      
+      const conflicts = [];
+      const productId = productData.id;
+      const currentPrice = parseFloat(productData.price) || 0;
+      
+      // Get all products to check for conflicts
+      const allProducts = this.products || [];
+      const currentProduct = allProducts.find(p => p.id === productId);
+      
+      // If offer data is provided, validate it
+      if (offerData) {
+        // Check for overlapping seasonal discounts
+        if (currentProduct?.seasonalDiscounts?.length > 0) {
+          const offerStart = new Date(offerData.startDate);
+          const offerEnd = new Date(offerData.endDate);
+          
+          for (const discount of currentProduct.seasonalDiscounts) {
+            const discountStart = new Date(discount.startDate);
+            const discountEnd = new Date(discount.endDate);
+            
+            // Check for date overlap
+            if (offerStart <= discountEnd && offerEnd >= discountStart) {
+              conflicts.push({
+                type: 'seasonal_discount_overlap',
+                message: `Offer period overlaps with existing seasonal discount (${discount.name})`,
+                conflictData: discount,
+                severity: 'high'
+              });
+            }
+          }
+        }
+        
+        // Check minimum pricing rules
+        const minPrice = currentPrice * 0.3; // 30% minimum
+        if (parseFloat(offerData.discountedPrice) < minPrice) {
+          conflicts.push({
+            type: 'minimum_price_violation',
+            message: `Offer price (${offerData.discountedPrice}) below minimum allowed (${minPrice.toFixed(2)})`,
+            conflictData: { minPrice, offerPrice: offerData.discountedPrice },
+            severity: 'critical'
+          });
+        }
+        
+        // Check vendor pricing agreements
+        if (currentProduct?.vendorAssignments?.length > 0) {
+          for (const assignment of currentProduct.vendorAssignments) {
+            if (assignment.minimumPrice && parseFloat(offerData.discountedPrice) < assignment.minimumPrice) {
+              conflicts.push({
+                type: 'vendor_agreement_violation',
+                message: `Offer violates vendor minimum price agreement`,
+                conflictData: assignment,
+                severity: 'high'
+              });
+            }
+          }
+        }
+      }
+      
+      // Check for pricing hierarchy conflicts
+      if (productData.category) {
+        const categoryProducts = allProducts.filter(p => 
+          p.category === productData.category && p.id !== productId
+        );
+        
+        for (const product of categoryProducts) {
+          if (product.tier && productData.tier) {
+            const tierDiff = parseInt(product.tier) - parseInt(productData.tier);
+            const priceDiff = parseFloat(product.price) - currentPrice;
+            
+            // Check if pricing doesn't match tier hierarchy
+            if ((tierDiff > 0 && priceDiff < 0) || (tierDiff < 0 && priceDiff > 0)) {
+              conflicts.push({
+                type: 'tier_pricing_conflict',
+                message: `Price doesn't align with product tier hierarchy`,
+                conflictData: { conflictProduct: product, tierDiff, priceDiff },
+                severity: 'medium'
+              });
+            }
+          }
+        }
+      }
+      
+      return {
+        isValid: conflicts.length === 0,
+        conflicts,
+        summary: {
+          total: conflicts.length,
+          critical: conflicts.filter(c => c.severity === 'critical').length,
+          high: conflicts.filter(c => c.severity === 'high').length,
+          medium: conflicts.filter(c => c.severity === 'medium').length
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error validating offer conflicts:', error);
+      return {
+        isValid: false,
+        conflicts: [{
+          type: 'validation_error',
+          message: 'Failed to validate offer conflicts',
+          conflictData: error,
+          severity: 'critical'
+        }],
+        summary: { total: 1, critical: 1, high: 0, medium: 0 }
+      };
+    }
+  }
+
+  // Calculate hierarchical pricing based on category and vendor relationships
+  calculateHierarchyPrice(productData) {
+    const basePrice = parseFloat(productData.price) || 0;
           currentValue: basePrice
         });
       }
