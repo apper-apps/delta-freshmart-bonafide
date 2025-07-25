@@ -1,596 +1,588 @@
-import vendorsData from "@/services/mockData/vendors.json";
-import productsData from "@/services/mockData/products.json";
+import vendorsData from '@/services/mockData/vendors.json'
+import productsData from '@/services/mockData/products.json'
 
 class VendorService {
   constructor() {
     this.vendors = [...vendorsData];
-    this.currentSession = null;
+    this.products = [...productsData];
+    this.sessionKey = 'vendor_session';
   }
 
+  // Authentication methods
   async login(credentials) {
-    await this.delay(500);
-    
-    const { email, password } = credentials;
-    
-    if (!email || !password) {
-      throw new Error('Email and password are required');
-    }
-    
-    const vendor = this.vendors.find(v => 
-      v.email.toLowerCase() === email.toLowerCase() && 
-      v.password === password &&
-      v.isActive
-    );
-    
-    if (!vendor) {
-      throw new Error('Invalid email or password');
-    }
-    
-    // Create session
-    this.currentSession = {
-      vendorId: vendor.Id,
-      email: vendor.email,
-      name: vendor.name,
-      role: 'vendor',
-      loginTime: new Date().toISOString(),
-      permissions: vendor.permissions || ['view_products', 'edit_prices']
-    };
-    
-    // Store session in localStorage
-    localStorage.setItem('vendorSession', JSON.stringify(this.currentSession));
-    
-    return {
-      vendor: {
-        Id: vendor.Id,
-        name: vendor.name,
+    try {
+      await this.delay();
+      
+      if (!credentials?.email || !credentials?.password) {
+        throw new Error('Email and password are required');
+      }
+
+      const vendor = this.vendors.find(v => 
+        v.email?.toLowerCase() === credentials.email.toLowerCase() && 
+        v.status === 'active'
+      );
+
+      if (!vendor) {
+        throw new Error('Invalid credentials or vendor not found');
+      }
+
+      // In a real app, you'd verify the password hash
+      if (credentials.password !== 'vendor123') {
+        throw new Error('Invalid credentials');
+      }
+
+      const session = {
+        vendorId: vendor.id,
         email: vendor.email,
-        company: vendor.company,
-        phone: vendor.phone,
-        permissions: vendor.permissions || ['view_products', 'edit_prices']
-      },
-      session: this.currentSession
-    };
+        name: vendor.name,
+        loginTime: new Date().toISOString(),
+        token: `vendor_token_${vendor.id}_${Date.now()}`
+      };
+
+      localStorage.setItem(this.sessionKey, JSON.stringify(session));
+      
+      await this.logAdminAction(`Vendor ${vendor.name} logged in`);
+      
+      return {
+        success: true,
+        vendor: {
+          id: vendor.id,
+          name: vendor.name,
+          email: vendor.email,
+          status: vendor.status
+        },
+        token: session.token
+      };
+    } catch (error) {
+      console.error('Vendor login error:', error);
+      throw new Error(error.message || 'Login failed');
+    }
   }
 
   async logout() {
-    await this.delay(200);
-    
-    this.currentSession = null;
-    localStorage.removeItem('vendorSession');
-    
-    return { success: true };
+    try {
+      const session = this.getCurrentSession();
+      if (session) {
+        await this.logAdminAction(`Vendor ${session.name} logged out`);
+      }
+      
+      localStorage.removeItem(this.sessionKey);
+      return { success: true, message: 'Logged out successfully' };
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw new Error('Logout failed');
+    }
   }
 
   getCurrentSession() {
-    if (this.currentSession) {
-      return this.currentSession;
-    }
-    
     try {
-      const storedSession = localStorage.getItem('vendorSession');
-      if (storedSession) {
-        this.currentSession = JSON.parse(storedSession);
-        return this.currentSession;
-      }
+      const sessionData = localStorage.getItem(this.sessionKey);
+      return sessionData ? JSON.parse(sessionData) : null;
     } catch (error) {
-      console.error('Error retrieving vendor session:', error);
+      console.error('Session retrieval error:', error);
+      return null;
     }
-    
-    return null;
   }
 
   async validateSession() {
-    await this.delay(100);
-    
-    const session = this.getCurrentSession();
-    
-    if (!session) {
-      return { valid: false, error: 'No active session' };
-    }
-    
-    // Check if vendor still exists and is active
-    const vendor = this.vendors.find(v => v.Id === session.vendorId && v.isActive);
-    
-    if (!vendor) {
-      this.logout();
-      return { valid: false, error: 'Vendor account not found or inactive' };
-    }
-    
-    // Check session age (24 hours)
-    const loginTime = new Date(session.loginTime);
-    const now = new Date();
-    const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
-    
-    if (hoursDiff > 24) {
-      this.logout();
-      return { valid: false, error: 'Session expired' };
-    }
-    
-    return { valid: true, session };
-  }
-
-  async getVendorProfile(vendorId) {
-    await this.delay(200);
-    
-    const vendor = this.vendors.find(v => v.Id === parseInt(vendorId));
-    
-    if (!vendor) {
-      throw new Error('Vendor not found');
-    }
-    
-    return {
-      Id: vendor.Id,
-      name: vendor.name,
-      email: vendor.email,
-      company: vendor.company,
-      phone: vendor.phone,
-      address: vendor.address,
-      joinDate: vendor.joinDate,
-      permissions: vendor.permissions || ['view_products', 'edit_prices'],
-      isActive: vendor.isActive
-    };
-  }
-
-  async updateVendorProfile(vendorId, profileData) {
-    await this.delay(300);
-    
-    const vendorIndex = this.vendors.findIndex(v => v.Id === parseInt(vendorId));
-    
-    if (vendorIndex === -1) {
-      throw new Error('Vendor not found');
-    }
-    
-    // Validate required fields
-    if (profileData.email && !this.isValidEmail(profileData.email)) {
-      throw new Error('Invalid email format');
-    }
-    
-    if (profileData.phone && !this.isValidPhone(profileData.phone)) {
-      throw new Error('Invalid phone number format');
-    }
-    
-    // Check for duplicate email
-    if (profileData.email) {
-      const existingVendor = this.vendors.find(v => 
-        v.email.toLowerCase() === profileData.email.toLowerCase() && 
-        v.Id !== parseInt(vendorId)
-      );
-      
-      if (existingVendor) {
-        throw new Error('Email already exists');
-      }
-    }
-    
-    // Update vendor profile
-    this.vendors[vendorIndex] = {
-      ...this.vendors[vendorIndex],
-      ...profileData,
-      Id: this.vendors[vendorIndex].Id, // Preserve ID
-      lastUpdated: new Date().toISOString()
-    };
-    
-    return {
-      Id: this.vendors[vendorIndex].Id,
-      name: this.vendors[vendorIndex].name,
-      email: this.vendors[vendorIndex].email,
-      company: this.vendors[vendorIndex].company,
-      phone: this.vendors[vendorIndex].phone,
-      address: this.vendors[vendorIndex].address
-    };
-  }
-
-  async changePassword(vendorId, passwordData) {
-    await this.delay(400);
-    
-    const { currentPassword, newPassword, confirmPassword } = passwordData;
-    
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      throw new Error('All password fields are required');
-    }
-    
-    if (newPassword !== confirmPassword) {
-      throw new Error('New passwords do not match');
-    }
-    
-    if (newPassword.length < 6) {
-      throw new Error('Password must be at least 6 characters long');
-    }
-    
-    const vendorIndex = this.vendors.findIndex(v => v.Id === parseInt(vendorId));
-    
-    if (vendorIndex === -1) {
-      throw new Error('Vendor not found');
-    }
-    
-    if (this.vendors[vendorIndex].password !== currentPassword) {
-      throw new Error('Current password is incorrect');
-    }
-    
-    this.vendors[vendorIndex].password = newPassword;
-    this.vendors[vendorIndex].lastPasswordChange = new Date().toISOString();
-    
-    return { success: true };
-  }
-
-async getAllVendors() {
-    await this.delay(200);
-    
-    return this.vendors.map(vendor => ({
-      Id: vendor.Id,
-      name: vendor.name,
-      email: vendor.email,
-      company: vendor.company,
-      phone: vendor.phone,
-      joinDate: vendor.joinDate,
-      isActive: vendor.isActive,
-      permissions: vendor.permissions || ['view_products', 'edit_prices']
-    }));
-  }
-
-  async getAll() {
-    await this.delay(200);
-    return [...this.vendors];
-  }
-
-  async getById(id) {
-    await this.delay(200);
-    
-    const vendor = this.vendors.find(v => v.Id === parseInt(id));
-    if (!vendor) {
-      throw new Error('Vendor not found');
-    }
-    
-    return { ...vendor };
-  }
-
-  async create(vendorData) {
-    await this.delay(400);
-    
-    // Validate required fields
-    if (!vendorData.name || !vendorData.email || !vendorData.password) {
-      throw new Error('Name, email, and password are required');
-    }
-    
-    if (!this.isValidEmail(vendorData.email)) {
-      throw new Error('Invalid email format');
-    }
-    
-    // Check for duplicate email
-    const existingVendor = this.vendors.find(v => 
-      v.email.toLowerCase() === vendorData.email.toLowerCase()
-    );
-    
-    if (existingVendor) {
-      throw new Error('Email already exists');
-    }
-    
-    const newVendor = {
-      Id: this.getNextId(),
-      name: vendorData.name,
-      email: vendorData.email,
-      password: vendorData.password,
-      company: vendorData.company || '',
-      phone: vendorData.phone || '',
-      address: vendorData.address || '',
-      joinDate: new Date().toISOString(),
-      isActive: vendorData.isActive !== undefined ? vendorData.isActive : true,
-      permissions: vendorData.permissions || ['view_products', 'edit_prices'],
-      createdAt: new Date().toISOString()
-    };
-    
-    this.vendors.push(newVendor);
-    return { ...newVendor };
-  }
-
-  async update(id, vendorData) {
-    await this.delay(300);
-    
-    const vendorIndex = this.vendors.findIndex(v => v.Id === parseInt(id));
-    
-    if (vendorIndex === -1) {
-      throw new Error('Vendor not found');
-    }
-    
-    // Validate email if provided
-    if (vendorData.email && !this.isValidEmail(vendorData.email)) {
-      throw new Error('Invalid email format');
-    }
-    
-    // Check for duplicate email
-    if (vendorData.email) {
-      const existingVendor = this.vendors.find(v => 
-        v.email.toLowerCase() === vendorData.email.toLowerCase() && 
-        v.Id !== parseInt(id)
-      );
-      
-      if (existingVendor) {
-        throw new Error('Email already exists');
-      }
-    }
-    
-    this.vendors[vendorIndex] = {
-      ...this.vendors[vendorIndex],
-      ...vendorData,
-      Id: this.vendors[vendorIndex].Id, // Preserve ID
-      lastUpdated: new Date().toISOString()
-    };
-    
-    return { ...this.vendors[vendorIndex] };
-  }
-
-  async delete(id) {
-    await this.delay(300);
-    
-    const vendorIndex = this.vendors.findIndex(v => v.Id === parseInt(id));
-    
-    if (vendorIndex === -1) {
-      throw new Error('Vendor not found');
-    }
-    
-    this.vendors.splice(vendorIndex, 1);
-    return { success: true };
-  }
-
-async createVendor(vendorData) {
-    await this.delay(400);
-    
-    // Validate required fields
-    if (!vendorData.name || !vendorData.email || !vendorData.password) {
-      throw new Error('Name, email, and password are required');
-    }
-    
-    if (!this.isValidEmail(vendorData.email)) {
-      throw new Error('Invalid email format');
-    }
-    
-    // Check for duplicate email
-    const existingVendor = this.vendors.find(v => 
-      v.email.toLowerCase() === vendorData.email.toLowerCase()
-    );
-    
-    if (existingVendor) {
-      throw new Error('Email already exists');
-    }
-    
-    const newVendor = {
-      Id: this.getNextId(),
-      name: vendorData.name,
-      email: vendorData.email,
-      password: vendorData.password,
-      company: vendorData.company || '',
-      phone: vendorData.phone || '',
-      address: vendorData.address || '',
-      joinDate: new Date().toISOString(),
-      isActive: vendorData.isActive !== undefined ? vendorData.isActive : true,
-      permissions: vendorData.permissions || ['view_products', 'edit_prices'],
-      createdAt: new Date().toISOString()
-    };
-    
-    this.vendors.push(newVendor);
-    
-    return {
-      Id: newVendor.Id,
-      name: newVendor.name,
-      email: newVendor.email,
-      company: newVendor.company,
-      phone: newVendor.phone,
-      joinDate: newVendor.joinDate,
-      isActive: newVendor.isActive,
-      permissions: newVendor.permissions
-    };
-  }
-
-  async updateVendor(vendorId, vendorData) {
-    await this.delay(300);
-    
-    const vendorIndex = this.vendors.findIndex(v => v.Id === parseInt(vendorId));
-    
-    if (vendorIndex === -1) {
-      throw new Error('Vendor not found');
-    }
-    
-    // Validate email if provided
-    if (vendorData.email && !this.isValidEmail(vendorData.email)) {
-      throw new Error('Invalid email format');
-    }
-    
-    // Check for duplicate email
-    if (vendorData.email) {
-      const existingVendor = this.vendors.find(v => 
-        v.email.toLowerCase() === vendorData.email.toLowerCase() && 
-        v.Id !== parseInt(vendorId)
-      );
-      
-      if (existingVendor) {
-        throw new Error('Email already exists');
-      }
-    }
-    
-    this.vendors[vendorIndex] = {
-      ...this.vendors[vendorIndex],
-      ...vendorData,
-      Id: this.vendors[vendorIndex].Id, // Preserve ID
-      lastUpdated: new Date().toISOString()
-    };
-    
-    return {
-      Id: this.vendors[vendorIndex].Id,
-      name: this.vendors[vendorIndex].name,
-      email: this.vendors[vendorIndex].email,
-      company: this.vendors[vendorIndex].company,
-      phone: this.vendors[vendorIndex].phone,
-      isActive: this.vendors[vendorIndex].isActive,
-      permissions: this.vendors[vendorIndex].permissions
-    };
-  }
-
-  async deleteVendor(vendorId) {
-    await this.delay(300);
-    
-    const vendorIndex = this.vendors.findIndex(v => v.Id === parseInt(vendorId));
-    
-    if (vendorIndex === -1) {
-      throw new Error('Vendor not found');
-    }
-    
-    this.vendors.splice(vendorIndex, 1);
-    
-    return { success: true };
-  }
-
-  getNextId() {
-    const maxId = this.vendors.reduce((max, vendor) => 
-      vendor.Id > max ? vendor.Id : max, 0);
-    return maxId + 1;
-  }
-
-isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-  isValidPhone(phone) {
-    const phoneRegex = /^[+]?[\d\s\-()]{10,}$/;
-    return phoneRegex.test(phone);
-  }
-async delay(ms = 200) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  // Get products associated with a specific vendor
-  async getVendorProducts(vendorId) {
-    await this.delay(300);
-    
-    if (!vendorId) {
-      throw new Error('Vendor ID is required');
-    }
-
     try {
-      // Import products data
-      const products = productsData || [];
-      
-      // Filter products by vendor ID
-      const vendorProducts = products.filter(product => 
-        product.vendorId === parseInt(vendorId) || 
-        product.vendor === parseInt(vendorId) ||
-        (product.supplier && product.supplier.id === parseInt(vendorId))
-      );
+      const session = this.getCurrentSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
 
-      // Ensure consistent product structure
-      return vendorProducts.map(product => ({
-        id: product.id,
-        name: product.name || product.title,
-        price: product.price || 0,
-        cost: product.cost || product.wholesalePrice || 0,
-        stock: product.stock || product.quantity || 0,
-        category: product.category,
-        description: product.description,
-        image: product.image || product.imageUrl,
-        vendorId: parseInt(vendorId),
-        isActive: product.isActive !== false,
-        sku: product.sku || `SKU-${product.id}`,
-        lastUpdated: product.lastUpdated || new Date().toISOString()
-      }));
+      const vendor = this.vendors.find(v => v.id === session.vendorId);
+      if (!vendor || vendor.status !== 'active') {
+        throw new Error('Vendor account is inactive');
+      }
+
+      return { valid: true, vendor: session };
     } catch (error) {
-      console.error('Error fetching vendor products:', error);
-      throw new Error(`Failed to load vendor products: ${error.message}`);
+      console.error('Session validation error:', error);
+      localStorage.removeItem(this.sessionKey);
+      throw new Error(error.message || 'Session validation failed');
     }
   }
 
-  // Assign products to vendor
-  async assignProductsToVendor(vendorId, productIds) {
-    await this.delay(400);
-    
-    if (!vendorId || !Array.isArray(productIds)) {
-      throw new Error('Vendor ID and product IDs array are required');
-    }
-
+  // Profile management methods
+  async getVendorProfile(vendorId) {
     try {
-      // In a real implementation, this would update the database
-      // For now, we'll simulate the assignment
-      const vendor = this.vendors.find(v => v.Id === parseInt(vendorId));
-      
+      await this.delay();
+
+      if (!vendorId) {
+        throw new Error('Vendor ID is required');
+      }
+
+      const vendor = this.vendors.find(v => v.id === vendorId);
       if (!vendor) {
         throw new Error('Vendor not found');
       }
 
-      // Simulate assignment success
-      const assignmentResult = {
-        vendorId: parseInt(vendorId),
-        vendorName: vendor.name,
-        assignedProducts: productIds.length,
-        assignedAt: new Date().toISOString(),
-        success: true
+      return {
+        success: true,
+        vendor: {
+          ...vendor,
+          // Don't return sensitive information
+          password: undefined
+        }
       };
-
-      console.log('Products assigned to vendor:', assignmentResult);
-      return assignmentResult;
     } catch (error) {
-      console.error('Error assigning products to vendor:', error);
-      throw new Error(`Failed to assign products: ${error.message}`);
+      console.error('Get vendor profile error:', error);
+      throw new Error(error.message || 'Failed to fetch vendor profile');
     }
   }
 
-  // Admin control functions
-  async toggleVendorStatus(vendorId, status) {
-    await this.delay(300);
-    
-    const vendorIndex = this.vendors.findIndex(v => v.Id === parseInt(vendorId));
-    
-    if (vendorIndex === -1) {
-      throw new Error('Vendor not found');
+  async updateVendorProfile(vendorId, profileData) {
+    try {
+      await this.delay();
+
+      if (!vendorId || !profileData) {
+        throw new Error('Vendor ID and profile data are required');
+      }
+
+      const vendorIndex = this.vendors.findIndex(v => v.id === vendorId);
+      if (vendorIndex === -1) {
+        throw new Error('Vendor not found');
+      }
+
+      // Validate email if being updated
+      if (profileData.email && !this.isValidEmail(profileData.email)) {
+        throw new Error('Invalid email format');
+      }
+
+      // Validate phone if being updated
+      if (profileData.phone && !this.isValidPhone(profileData.phone)) {
+        throw new Error('Invalid phone format');
+      }
+
+      // Check for duplicate email
+      if (profileData.email) {
+        const existingVendor = this.vendors.find(v => 
+          v.email?.toLowerCase() === profileData.email.toLowerCase() && 
+          v.id !== vendorId
+        );
+        if (existingVendor) {
+          throw new Error('Email already exists');
+        }
+      }
+
+      this.vendors[vendorIndex] = {
+        ...this.vendors[vendorIndex],
+        ...profileData,
+        id: vendorId, // Ensure ID doesn't change
+        updatedAt: new Date().toISOString()
+      };
+
+      await this.logAdminAction(`Vendor profile updated: ${this.vendors[vendorIndex].name}`);
+
+      return {
+        success: true,
+        message: 'Profile updated successfully',
+        vendor: this.vendors[vendorIndex]
+      };
+    } catch (error) {
+      console.error('Update vendor profile error:', error);
+      throw new Error(error.message || 'Failed to update vendor profile');
     }
-    
-    const isActive = status === 'active';
-    this.vendors[vendorIndex].isActive = isActive;
-    this.vendors[vendorIndex].statusLastUpdated = new Date().toISOString();
-    this.vendors[vendorIndex].lastUpdatedBy = 'admin';
-    
-    return {
-      Id: this.vendors[vendorIndex].Id,
-      name: this.vendors[vendorIndex].name,
-      isActive: isActive,
-      statusLastUpdated: this.vendors[vendorIndex].statusLastUpdated
-    };
+  }
+
+  async changePassword(vendorId, passwordData) {
+    try {
+      await this.delay();
+
+      if (!vendorId || !passwordData?.currentPassword || !passwordData?.newPassword) {
+        throw new Error('Current password and new password are required');
+      }
+
+      const vendor = this.vendors.find(v => v.id === vendorId);
+      if (!vendor) {
+        throw new Error('Vendor not found');
+      }
+
+      // In a real app, you'd verify the current password hash
+      if (passwordData.currentPassword !== 'vendor123') {
+        throw new Error('Current password is incorrect');
+      }
+
+      if (passwordData.newPassword.length < 6) {
+        throw new Error('New password must be at least 6 characters long');
+      }
+
+      // In a real app, you'd hash the new password
+      await this.logAdminAction(`Password changed for vendor: ${vendor.name}`);
+
+      return {
+        success: true,
+        message: 'Password changed successfully'
+      };
+    } catch (error) {
+      console.error('Change password error:', error);
+      throw new Error(error.message || 'Failed to change password');
+    }
+  }
+
+  // Admin vendor management methods
+  async getAllVendors() {
+    return this.getAll();
+  }
+
+  async getAll() {
+    try {
+      await this.delay();
+      return {
+        success: true,
+        vendors: this.vendors.map(vendor => ({
+          ...vendor,
+          password: undefined // Don't return passwords
+        }))
+      };
+    } catch (error) {
+      console.error('Get all vendors error:', error);
+      throw new Error('Failed to fetch vendors');
+    }
+  }
+
+  async getById(id) {
+    try {
+      await this.delay();
+
+      if (!id) {
+        throw new Error('Vendor ID is required');
+      }
+
+      const vendor = this.vendors.find(v => v.id === id);
+      if (!vendor) {
+        throw new Error('Vendor not found');
+      }
+
+      return {
+        success: true,
+        vendor: {
+          ...vendor,
+          password: undefined
+        }
+      };
+    } catch (error) {
+      console.error('Get vendor by ID error:', error);
+      throw new Error(error.message || 'Failed to fetch vendor');
+    }
+  }
+
+  async create(vendorData) {
+    return this.createVendor(vendorData);
+  }
+
+  async update(id, vendorData) {
+    return this.updateVendor(id, vendorData);
+  }
+
+  async delete(id) {
+    return this.deleteVendor(id);
+  }
+
+  async createVendor(vendorData) {
+    try {
+      await this.delay();
+
+      if (!vendorData) {
+        throw new Error('Vendor data is required');
+      }
+
+      const { name, email, phone, businessType, address } = vendorData;
+
+      if (!name || !email || !phone) {
+        throw new Error('Name, email, and phone are required');
+      }
+
+      if (!this.isValidEmail(email)) {
+        throw new Error('Invalid email format');
+      }
+
+      if (!this.isValidPhone(phone)) {
+        throw new Error('Invalid phone format');
+      }
+
+      // Check for duplicate email
+      const existingVendor = this.vendors.find(v => 
+        v.email?.toLowerCase() === email.toLowerCase()
+      );
+      if (existingVendor) {
+        throw new Error('Email already exists');
+      }
+
+      const newVendor = {
+        id: this.getNextId(),
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        phone: phone.trim(),
+        businessType: businessType || 'General',
+        address: address || '',
+        status: 'active',
+        rating: 0,
+        totalOrders: 0,
+        joinedDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        assignedProducts: []
+      };
+
+      this.vendors.push(newVendor);
+
+      await this.logAdminAction(`New vendor created: ${newVendor.name}`);
+      await this.notifyVendor(newVendor.id, 'Welcome! Your vendor account has been created.');
+
+      return {
+        success: true,
+        message: 'Vendor created successfully',
+        vendor: newVendor
+      };
+    } catch (error) {
+      console.error('Create vendor error:', error);
+      throw new Error(error.message || 'Failed to create vendor');
+    }
+  }
+
+  async updateVendor(vendorId, vendorData) {
+    try {
+      await this.delay();
+
+      if (!vendorId || !vendorData) {
+        throw new Error('Vendor ID and data are required');
+      }
+
+      const vendorIndex = this.vendors.findIndex(v => v.id === vendorId);
+      if (vendorIndex === -1) {
+        throw new Error('Vendor not found');
+      }
+
+      // Validate email if being updated
+      if (vendorData.email && !this.isValidEmail(vendorData.email)) {
+        throw new Error('Invalid email format');
+      }
+
+      // Validate phone if being updated
+      if (vendorData.phone && !this.isValidPhone(vendorData.phone)) {
+        throw new Error('Invalid phone format');
+      }
+
+      // Check for duplicate email
+      if (vendorData.email) {
+        const existingVendor = this.vendors.find(v => 
+          v.email?.toLowerCase() === vendorData.email.toLowerCase() && 
+          v.id !== vendorId
+        );
+        if (existingVendor) {
+          throw new Error('Email already exists');
+        }
+      }
+
+      this.vendors[vendorIndex] = {
+        ...this.vendors[vendorIndex],
+        ...vendorData,
+        id: vendorId, // Ensure ID doesn't change
+        updatedAt: new Date().toISOString()
+      };
+
+      await this.logAdminAction(`Vendor updated: ${this.vendors[vendorIndex].name}`);
+
+      return {
+        success: true,
+        message: 'Vendor updated successfully',
+        vendor: this.vendors[vendorIndex]
+      };
+    } catch (error) {
+      console.error('Update vendor error:', error);
+      throw new Error(error.message || 'Failed to update vendor');
+    }
+  }
+
+  async deleteVendor(vendorId) {
+    try {
+      await this.delay();
+
+      if (!vendorId) {
+        throw new Error('Vendor ID is required');
+      }
+
+      const vendorIndex = this.vendors.findIndex(v => v.id === vendorId);
+      if (vendorIndex === -1) {
+        throw new Error('Vendor not found');
+      }
+
+      const vendor = this.vendors[vendorIndex];
+      
+      // Check if vendor has active orders (in a real app)
+      // For now, we'll just soft delete by setting status to inactive
+      this.vendors[vendorIndex] = {
+        ...this.vendors[vendorIndex],
+        status: 'inactive',
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await this.logAdminAction(`Vendor deleted: ${vendor.name}`);
+
+      return {
+        success: true,
+        message: 'Vendor deleted successfully'
+      };
+    } catch (error) {
+      console.error('Delete vendor error:', error);
+      throw new Error(error.message || 'Failed to delete vendor');
+    }
+  }
+
+  // Product management methods
+  async getVendorProducts(vendorId) {
+    try {
+      await this.delay();
+
+      if (!vendorId) {
+        throw new Error('Vendor ID is required');
+      }
+
+      const vendor = this.vendors.find(v => v.id === vendorId);
+      if (!vendor) {
+        throw new Error('Vendor not found');
+      }
+
+      // Get products assigned to this vendor
+      const vendorProducts = this.products.filter(product => 
+        vendor.assignedProducts?.includes(product.id) ||
+        product.vendorId === vendorId
+      );
+
+      return {
+        success: true,
+        products: vendorProducts,
+        totalProducts: vendorProducts.length
+      };
+    } catch (error) {
+      console.error('Get vendor products error:', error);
+      throw new Error(error.message || 'Failed to fetch vendor products');
+    }
+  }
+
+  async assignProductsToVendor(vendorId, productIds) {
+    try {
+      await this.delay();
+
+      if (!vendorId || !Array.isArray(productIds)) {
+        throw new Error('Vendor ID and product IDs array are required');
+      }
+
+      const vendorIndex = this.vendors.findIndex(v => v.id === vendorId);
+      if (vendorIndex === -1) {
+        throw new Error('Vendor not found');
+      }
+
+      // Validate that all product IDs exist
+      const invalidProducts = productIds.filter(productId => 
+        !this.products.some(p => p.id === productId)
+      );
+
+      if (invalidProducts.length > 0) {
+        throw new Error(`Invalid product IDs: ${invalidProducts.join(', ')}`);
+      }
+
+      // Update vendor's assigned products
+      const currentProducts = this.vendors[vendorIndex].assignedProducts || [];
+      const newAssignedProducts = [...new Set([...currentProducts, ...productIds])];
+
+      this.vendors[vendorIndex] = {
+        ...this.vendors[vendorIndex],
+        assignedProducts: newAssignedProducts,
+        updatedAt: new Date().toISOString()
+      };
+
+      await this.logAdminAction(`Products assigned to vendor: ${this.vendors[vendorIndex].name}`);
+      await this.notifyVendor(vendorId, `${productIds.length} new product(s) have been assigned to you.`);
+
+      return {
+        success: true,
+        message: 'Products assigned successfully',
+        assignedProducts: newAssignedProducts
+      };
+    } catch (error) {
+      console.error('Assign products error:', error);
+      throw new Error(error.message || 'Failed to assign products');
+    }
+  }
+
+  async toggleVendorStatus(vendorId, status) {
+    try {
+      await this.delay();
+
+      if (!vendorId || !status) {
+        throw new Error('Vendor ID and status are required');
+      }
+
+      if (!['active', 'inactive', 'suspended'].includes(status)) {
+        throw new Error('Invalid status. Must be active, inactive, or suspended');
+      }
+
+      const vendorIndex = this.vendors.findIndex(v => v.id === vendorId);
+      if (vendorIndex === -1) {
+        throw new Error('Vendor not found');
+      }
+
+      const oldStatus = this.vendors[vendorIndex].status;
+      this.vendors[vendorIndex] = {
+        ...this.vendors[vendorIndex],
+        status,
+        updatedAt: new Date().toISOString()
+      };
+
+      await this.logAdminAction(`Vendor status changed: ${this.vendors[vendorIndex].name} from ${oldStatus} to ${status}`);
+      await this.notifyVendor(vendorId, `Your account status has been changed to ${status}.`);
+
+      return {
+        success: true,
+        message: 'Vendor status updated successfully',
+        vendor: this.vendors[vendorIndex]
+      };
+    } catch (error) {
+      console.error('Toggle vendor status error:', error);
+      throw new Error(error.message || 'Failed to update vendor status');
+    }
+  }
+
+  // Utility methods
+  getNextId() {
+    const maxId = Math.max(...this.vendors.map(v => parseInt(v.id) || 0), 0);
+    return (maxId + 1).toString();
+  }
+
+  isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  isValidPhone(phone) {
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    return phoneRegex.test(phone.replace(/[-\s\(\)]/g, ''));
+  }
+
+  async delay(ms = 200) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async logAdminAction(action) {
-    await this.delay(100);
-    
-    const logEntry = {
-      action: action,
-      timestamp: new Date().toISOString(),
-      adminId: 'current_admin', // In real app, get from session
-      type: 'vendor_management'
-    };
-    
-    // In real implementation, this would save to database
-    console.log('Admin Action Logged:', logEntry);
-    
-    return logEntry;
+    try {
+      console.log(`[Vendor Service] ${new Date().toISOString()}: ${action}`);
+      // In a real app, this would send to a logging service
+    } catch (error) {
+      console.error('Logging error:', error);
+    }
   }
 
   async notifyVendor(vendorId, message) {
-    await this.delay(200);
-    
-    const vendor = this.vendors.find(v => v.Id === parseInt(vendorId));
-    
-    if (!vendor) {
-      throw new Error('Vendor not found');
+    try {
+      console.log(`[Vendor Notification] ${vendorId}: ${message}`);
+      // In a real app, this would send a notification to the vendor
+    } catch (error) {
+      console.error('Notification error:', error);
     }
-    
-    // In real implementation, this would send email/SMS/push notification
-    const notification = {
-      vendorId: vendorId,
-      vendorEmail: vendor.email,
-      message: message,
-      type: 'admin_notification',
-      sentAt: new Date().toISOString(),
-      status: 'sent'
-    };
-    
-    console.log('Vendor Notification Sent:', notification);
-    
-    return notification;
   }
 }
 
