@@ -11,16 +11,36 @@ class SessionService {
       session: 'user_session',
       user: 'current_user',
       token: 'auth_token'
-    };
+};
     
-    // Auto-initialize
-    this.initializeSession();
+    // Initialize on first access instead of constructor
+    this._initialized = false;
+    this._initializing = false;
+  }
+  
+  // Ensure initialization before any operation
+  async _ensureInitialized() {
+    if (this._initialized) return;
+    if (this._initializing) return;
+    
+    try {
+      this._initializing = true;
+      await this.initializeSession();
+      this._initialized = true;
+    } catch (error) {
+      console.error('SessionService: Delayed initialization failed:', error);
+      // Set basic fallback state
+      this.currentSession = this.createMinimalSession();
+      this._initialized = true;
+    } finally {
+      this._initializing = false;
+    }
   }
 
   /**
    * Initialize session from storage or create new one
    */
-  async initializeSession() {
+async initializeSession() {
     if (this.isInitializing) return this.currentSession;
     
     this.isInitializing = true;
@@ -49,12 +69,41 @@ class SessionService {
       
     } catch (error) {
       console.error('SessionService: Error during initialization:', error);
-      // Fallback to guest session
-      await this.createGuestSession();
+      // Fallback to minimal session without async operations
+      try {
+        await this.createGuestSession();
+      } catch (guestError) {
+        console.error('SessionService: Guest session creation failed:', guestError);
+        this.currentSession = this.createMinimalSession();
+      }
       return this.currentSession;
     } finally {
       this.isInitializing = false;
     }
+  }
+
+  // Add method to get current session with lazy initialization
+  async getCurrentSession() {
+    await this._ensureInitialized();
+    return this.currentSession;
+  }
+
+  // Add method to check authentication with lazy initialization
+  async isAuthenticated() {
+    await this._ensureInitialized();
+    return this.currentSession && this.currentSession.user && this.currentSession.user.id !== null;
+  }
+
+  // Add method to get current user with lazy initialization
+  async getCurrentUser() {
+    await this._ensureInitialized();
+    return this.currentSession ? this.currentSession.user : null;
+  }
+
+  // Add method to get token with lazy initialization
+  async getToken() {
+    await this._ensureInitialized();
+    return this.currentSession ? this.currentSession.token : null;
   }
 
   /**
@@ -631,30 +680,79 @@ const sessionToValidate = session || this.currentSession;
     }
   }
 }
-// Create singleton instance with error handling
+// Create singleton instance with improved error handling
 let sessionService;
-try {
-  sessionService = new SessionService();
-} catch (error) {
-  console.error('Failed to initialize SessionService:', error);
-  // Create minimal fallback service
-  sessionService = {
-    getCurrentSession: async () => null,
-    isAuthenticated: async () => false,
-    getCurrentUser: async () => null,
-    getToken: async () => null,
-    createSession: async () => null,
-    validateSession: async () => false,
-    clearSession: () => {},
-    refreshSession: async () => null,
-    updateUser: async () => null,
-    getSessionInfo: async () => ({}),
-    addListener: () => {},
-    removeListener: () => {},
-    initialized: false,
-    error: error.message
-  };
+
+// Safe singleton creation
+function createSessionService() {
+  try {
+    return new SessionService();
+  } catch (error) {
+    console.error('Failed to initialize SessionService:', error);
+    
+    // Create robust fallback service that matches the interface
+    return {
+      // Core session methods
+      getCurrentSession: async () => {
+        console.warn('SessionService: Using fallback getCurrentSession');
+        return null;
+      },
+      isAuthenticated: async () => {
+        console.warn('SessionService: Using fallback isAuthenticated');
+        return false;
+      },
+      getCurrentUser: async () => {
+        console.warn('SessionService: Using fallback getCurrentUser');
+        return null;
+      },
+      getToken: async () => {
+        console.warn('SessionService: Using fallback getToken');
+        return null;
+      },
+      
+      // Session management methods
+      createSession: async (userData, token = null) => {
+        console.warn('SessionService: Using fallback createSession');
+        return null;
+      },
+      validateSession: async (session = null) => {
+        console.warn('SessionService: Using fallback validateSession');
+        return false;
+      },
+      clearSession: () => {
+        console.warn('SessionService: Using fallback clearSession');
+      },
+      refreshSession: async (session = null) => {
+        console.warn('SessionService: Using fallback refreshSession');
+        return null;
+      },
+      updateUser: async (userData) => {
+        console.warn('SessionService: Using fallback updateUser');
+        return null;
+      },
+      
+      // Utility methods
+      getSessionInfo: async () => {
+        console.warn('SessionService: Using fallback getSessionInfo');
+        return {};
+      },
+      addListener: (callback) => {
+        console.warn('SessionService: Using fallback addListener');
+      },
+      removeListener: (callback) => {
+        console.warn('SessionService: Using fallback removeListener');
+      },
+      
+      // State flags
+      initialized: false,
+      error: error.message,
+      isFallback: true
+    };
+  }
 }
+
+// Initialize singleton
+sessionService = createSessionService();
 
 // Export singleton instance as default and class for flexibility
 export default sessionService;
