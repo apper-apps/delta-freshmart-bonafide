@@ -15,8 +15,7 @@ class SessionService {
     this.initializeSession();
   }
 
-  /**
-   * Initialize session service and validate existing session
+* Initialize session service and validate existing session
    */
   initializeSession() {
     try {
@@ -34,15 +33,34 @@ class SessionService {
   }
 
   /**
-   * Validate current session - main method that was throwing the error
-   * @returns {Object} Session validation result
+   * Validate current session - enhanced with comprehensive error handling
+   * @returns {Object} Session validation result - never throws errors
    */
-validateSession() {
+  validateSession() {
     try {
-      const session = this.getCurrentSession();
+      // Safely get current session with error handling
+      let session;
+      try {
+        session = this.getCurrentSession();
+      } catch (sessionError) {
+        console.warn('SessionService: Error getting current session:', sessionError);
+        return {
+          isValid: false,
+          error: 'Session retrieval failed',
+          requiresAuth: true,
+          details: 'Unable to access session data'
+        };
+      }
       
       if (!session || typeof session !== 'object') {
         console.warn('SessionService: No active session found');
+        // Try to initialize a guest session as fallback
+        try {
+          this.createGuestSession();
+        } catch (guestError) {
+          console.warn('SessionService: Failed to create guest session:', guestError);
+        }
+        
         return {
           isValid: false,
           error: 'No active session',
@@ -51,58 +69,190 @@ validateSession() {
         };
       }
 
-      // Check session expiration
-      if (this.isSessionExpired(session)) {
-        console.warn('SessionService: Session has expired');
-        this.clearSession();
-        return {
-          isValid: false,
-          error: 'Session expired',
-          requiresAuth: true,
-          details: 'Session timestamp indicates expiration'
-        };
-      }
-
-      // Validate session data integrity
-      if (!this.validateSessionData(session)) {
-        console.warn('SessionService: Session data validation failed');
-        this.clearSession();
-        return {
-          isValid: false,
-          error: 'Invalid session data',
-          requiresAuth: true,
-          details: 'Session data structure or content is invalid'
-        };
-      }
-
-      // Refresh session timestamp
+      // Check session expiration with error handling
       try {
-        this.refreshSession(session);
-      } catch (refreshError) {
-        console.warn('SessionService: Failed to refresh session:', refreshError);
-        // Continue with validation even if refresh fails
+        if (this.isSessionExpired(session)) {
+          console.warn('SessionService: Session has expired');
+          this.clearSession();
+          return {
+            isValid: false,
+            error: 'Session expired',
+            requiresAuth: true,
+            details: 'Session timestamp indicates expiration'
+          };
+        }
+      } catch (expirationError) {
+        console.warn('SessionService: Error checking session expiration:', expirationError);
+        return {
+          isValid: false,
+          error: 'Session validation failed',
+          requiresAuth: true,
+          details: 'Unable to validate session expiration'
+        };
       }
 
+      // Validate session data structure with error handling
+      try {
+        if (!this.validateSessionData(session)) {
+          console.warn('SessionService: Session data validation failed');
+          this.clearSession();
+          return {
+            isValid: false,
+            error: 'Invalid session data',
+            requiresAuth: true,
+            details: 'Session data structure is corrupted'
+          };
+        }
+      } catch (validationError) {
+        console.warn('SessionService: Error validating session data:', validationError);
+        this.clearSession();
+        return {
+          isValid: false,
+          error: 'Session validation error',
+          requiresAuth: true,
+          details: 'Unable to validate session data structure'
+        };
+      }
+
+      // Session is valid
       return {
         isValid: true,
         session: session,
         user: session.user || null,
-        details: 'Session validation successful'
+        token: session.token || null,
+        details: 'Session is valid and active'
       };
+
     } catch (error) {
-      console.error('SessionService: Session validation failed:', error);
+      // Ultimate fallback - ensure no errors escape this method
+      console.error('SessionService: Critical error in validateSession:', error);
       
-      // Ensure error is always a string, never an Error object
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Try to clear session safely
+      try {
+        this.clearSession();
+      } catch (clearError) {
+        console.error('SessionService: Failed to clear session after error:', clearError);
+      }
       
       return {
         isValid: false,
-        error: errorMessage || 'Session validation error',
+        error: 'Session validation error',
         requiresAuth: true,
-        details: `Validation exception: ${errorMessage}`,
-        stack: error instanceof Error ? error.stack : undefined
+        details: `Critical session error: ${error.message || 'Unknown error'}`
       };
     }
+  }
+
+  /**
+   * Get current session with enhanced error handling
+   * @returns {Object|null} Current session or null
+   */
+  getCurrentSession() {
+    try {
+      // Return current session if available
+      if (this.currentSession && typeof this.currentSession === 'object') {
+        return this.currentSession;
+      }
+
+      // Try to load from storage
+      const storedSession = this.getStoredSession();
+      if (storedSession && this.validateSessionData(storedSession)) {
+        this.currentSession = storedSession;
+        return storedSession;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('SessionService: Error in getCurrentSession:', error);
+      // Clear potentially corrupted session
+      this.currentSession = null;
+      return null;
+    }
+  }
+
+  /**
+   * Enhanced session data validation with error handling
+   * @param {Object} session - Session to validate
+   * @returns {boolean} True if valid
+   */
+  validateSessionData(session) {
+    try {
+      if (!session || typeof session !== 'object') {
+        return false;
+      }
+
+      // Check required properties
+      if (!session.id || !session.createdAt) {
+        return false;
+      }
+
+      // Validate timestamps
+      if (typeof session.createdAt !== 'number' || session.createdAt <= 0) {
+        return false;
+      }
+
+      if (session.expiresAt && (typeof session.expiresAt !== 'number' || session.expiresAt <= 0)) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('SessionService: Error validating session data:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Enhanced session expiration check with error handling
+   * @param {Object} session - Session to check
+   * @returns {boolean} True if expired
+   */
+  isSessionExpired(session) {
+    try {
+      if (!session || typeof session !== 'object') {
+        return true;
+      }
+
+      // If no expiration time set, consider it non-expiring
+      if (!session.expiresAt) {
+        return false;
+      }
+
+      return Date.now() > session.expiresAt;
+    } catch (error) {
+      console.error('SessionService: Error checking session expiration:', error);
+      // On error, consider session expired for security
+      return true;
+    }
+  }
+
+  /**
+   * Enhanced stored session retrieval with error handling
+   * @returns {Object|null} Stored session or null
+   */
+  getStoredSession() {
+    try {
+      if (typeof localStorage === 'undefined') {
+        console.warn('SessionService: localStorage not available');
+        return null;
+      }
+
+      const stored = localStorage.getItem('freshmart_session');
+      if (!stored) {
+        return null;
+      }
+
+      return JSON.parse(stored);
+    } catch (error) {
+      console.error('SessionService: Error retrieving stored session:', error);
+      // Clear potentially corrupted data
+      try {
+        localStorage.removeItem('freshmart_session');
+      } catch (clearError) {
+        console.error('SessionService: Failed to clear corrupted session:', clearError);
+      }
+      return null;
+}
   }
 
   /**
@@ -141,29 +291,6 @@ validateSession() {
     } catch (error) {
       console.error('SessionService: Failed to create session:', error);
       throw new Error(`Session creation failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Get current active session
-   * @returns {Object|null} Current session or null
-   */
-  getCurrentSession() {
-    try {
-      if (this.currentSession) {
-        return this.currentSession;
-      }
-
-      const storedSession = this.getStoredSession();
-      if (storedSession && this.validateSessionData(storedSession)) {
-        this.currentSession = storedSession;
-        return storedSession;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('SessionService: Failed to get current session:', error);
-      return null;
     }
   }
 
@@ -258,9 +385,9 @@ validateSession() {
   /**
    * Check if user is authenticated
    * @returns {boolean} Authentication status
-   */
+*/
   isAuthenticated() {
-try {
+    try {
       const validation = this.validateSession();
       
       // Handle validation response properly
@@ -288,41 +415,7 @@ try {
       
       return false;
     }
-  }
-
-  /**
-   * Check if session has expired
-   * @param {Object} session - Session to check
-   * @returns {boolean} Expiration status
-   */
-  isSessionExpired(session) {
-    try {
-      if (!session?.expiresAt) return true;
-      return new Date() > new Date(session.expiresAt);
-    } catch (error) {
-      console.error('SessionService: Failed to check session expiration:', error);
-      return true;
-    }
-  }
-
-  /**
-   * Validate session data structure
-   * @param {Object} session - Session to validate
-   * @returns {boolean} Validation result
-   */
-  validateSessionData(session) {
-    try {
-      if (!session || typeof session !== 'object') return false;
-      if (!session.user || typeof session.user !== 'object') return false;
-      if (!session.createdAt || !session.lastActivity) return false;
-      if (!session.sessionId) return false;
-      
-      return true;
-    } catch (error) {
-      console.error('SessionService: Session data validation failed:', error);
-      return false;
-    }
-  }
+}
 
   /**
    * Store session in localStorage
@@ -338,30 +431,7 @@ try {
     } catch (error) {
       console.error('SessionService: Failed to store session:', error);
     }
-  }
-
-  /**
-   * Get stored session from localStorage
-   * @returns {Object|null} Stored session or null
-   */
-  getStoredSession() {
-    try {
-      const sessionData = localStorage.getItem(this.storageKey);
-      if (!sessionData) return null;
-      
-      const session = JSON.parse(sessionData);
-      
-      // Ensure token is available
-      if (!session.token) {
-        session.token = localStorage.getItem(this.tokenKey);
-      }
-      
-      return session;
-    } catch (error) {
-      console.error('SessionService: Failed to get stored session:', error);
-      return null;
-    }
-  }
+}
 
   /**
    * Generate unique session ID
