@@ -641,11 +641,11 @@ async getCurrentSession() {
     }
   }
 
-  /**
+/**
    * Get session info for debugging
    * @returns {Object} Session debug info
    */
-  getSessionInfo() {
+  async getSessionInfo() {
     try {
 const session = await this.getCurrentSession();
       if (!session) {
