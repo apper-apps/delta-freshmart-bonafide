@@ -4,15 +4,35 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { Provider, useDispatch } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
-import { persistor, store } from "@/store/index";
+import "@/index.css";
 import { addRealTimeNotification, setConnectionStatus, updateApprovalStatus } from "@/store/approvalWorkflowSlice";
-import Layout from "@/components/organisms/Layout";
-import Loading from "@/components/ui/Loading";
+import { persistor, store } from "@/store/index";
+import { shouldRetry } from "@/utils/errorHandling";
+import webSocketService from "@/services/api/websocketService";
+import Category from "@/components/pages/Category";
+import AIGenerate from "@/components/pages/AIGenerate";
+import PaymentManagement from "@/components/pages/PaymentManagement";
+import OrderSummary from "@/components/pages/OrderSummary";
+import PayrollManagement from "@/components/pages/PayrollManagement";
+import FinancialDashboard from "@/components/pages/FinancialDashboard";
+import ProductManagement from "@/components/pages/ProductManagement";
+import Analytics from "@/components/pages/Analytics";
+import VendorManagement from "@/components/pages/VendorManagement";
+import VendorPortal from "@/components/pages/VendorPortal";
+import { RoleAssignment } from "@/components/pages/RoleAssignment";
+import POS from "@/components/pages/POS";
 import Cart from "@/components/pages/Cart";
-import Checkout from "@/components/pages/Checkout";
 import Home from "@/components/pages/Home";
 import ProductDetail from "@/components/pages/ProductDetail";
-import webSocketService from "@/services/api/websocketService";
+import Orders from "@/components/pages/Orders";
+import Checkout from "@/components/pages/Checkout";
+import Account from "@/components/pages/Account";
+import DeliveryTracking from "@/components/pages/DeliveryTracking";
+import AdminDashboard from "@/components/pages/AdminDashboard";
+import OrderTracking from "@/components/pages/OrderTracking";
+import Layout from "@/components/organisms/Layout";
+import Error from "@/components/ui/Error";
+import Loading from "@/components/ui/Loading";
 // Error boundary for lazy-loaded components
 class LazyErrorBoundary extends React.Component {
   constructor(props) {
@@ -104,6 +124,7 @@ class LazyErrorBoundary extends React.Component {
 }
 
 // Safe lazy loading with error handling
+// Enhanced lazy loading with production error handling
 const createLazyComponent = (importFn, componentName) => {
   let retryCount = 0;
   const maxRetries = 3;
@@ -127,73 +148,117 @@ const createLazyComponent = (importFn, componentName) => {
         componentName,
         timestamp: new Date().toISOString(),
         retryAttempt: retryCount + 1,
-        networkStatus: navigator.onLine ? 'online' : 'offline'
+        networkStatus: navigator.onLine ? 'online' : 'offline',
+        userAgent: navigator.userAgent,
+        location: window.location.href
       });
       
-      // Provide specific error guidance
-      if (error?.message?.includes('Loading chunk')) {
-        console.error(`Network issue loading ${componentName}: Check internet connection`);
+      // Enhanced error categorization for production issues
+      let errorCategory = 'unknown';
+      let userMessage = `The ${componentName} component could not be loaded.`;
+      let technicalDetails = error?.message || 'Unknown error';
+      
+      if (error?.message?.includes('Loading chunk') || error?.message?.includes('Failed to fetch')) {
+        errorCategory = 'chunk-loading';
+        userMessage = `Network error loading ${componentName}. This may be due to a poor connection or server issue.`;
+        technicalDetails = 'Dynamic import chunk failed to load - check network connectivity and server availability';
       } else if (error?.message?.includes('404')) {
-        console.error(`File not found: Check if ${componentName} exists in the correct path`);
+        errorCategory = 'file-not-found';
+        userMessage = `${componentName} is temporarily unavailable.`;
+        technicalDetails = 'Component file not found on server - possible deployment issue';
       } else if (error?.message?.includes('SyntaxError')) {
-        console.error(`Syntax error in ${componentName}: Check for JavaScript syntax issues`);
-      } else if (error?.message?.includes('import')) {
-        console.error(`Import error in ${componentName}: Check import statements and exports`);
+        errorCategory = 'syntax-error';
+        userMessage = `${componentName} has a configuration error.`;
+        technicalDetails = 'JavaScript syntax error in component - check build process';
+      } else if (error?.message?.includes('import') || error?.message?.includes('module')) {
+        errorCategory = 'module-error';
+        userMessage = `${componentName} has dependency issues.`;
+        technicalDetails = 'Module resolution error - check imports and exports';
       }
       
-      // Retry logic for network-related errors
-      if (retryCount < maxRetries && 
-          (error?.message?.includes('Loading chunk') || 
-           error?.message?.includes('fetch') ||
-           error?.message?.includes('network'))) {
+      // Production-specific retry logic with exponential backoff
+      const shouldRetry = retryCount < maxRetries && (
+        errorCategory === 'chunk-loading' || 
+        errorCategory === 'file-not-found' ||
+        error?.message?.includes('fetch') ||
+        error?.message?.includes('network')
+      );
+      
+      if (shouldRetry) {
         retryCount++;
-        console.log(`Retrying ${componentName} load (${retryCount}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Max 10s delay
+        console.log(`Retrying ${componentName} load (${retryCount}/${maxRetries}) in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         return loadWithRetry();
       }
       
-      // Return enhanced fallback component with retry capability
+      // Return enhanced fallback component with production-ready error handling
       return {
         default: () => (
-          <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex items-center justify-center min-h-[400px] px-4">
             <div className="text-center p-8 max-w-md mx-auto">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Component Unavailable</h2>
-              <p className="text-gray-600 mb-4">
-                The {componentName} component could not be loaded.
-                {!navigator.onLine && (
-                  <span className="block text-orange-600 mt-2">
-                    You appear to be offline. Please check your internet connection.
-                  </span>
-                )}
-              </p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-left">
-                <p className="text-sm text-red-700 font-medium mb-1">Error Details:</p>
-                <p className="text-xs text-red-600 break-all">{error?.message || 'Unknown error'}</p>
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-gray-800 mb-2">Component Unavailable</h2>
+                <p className="text-gray-600 mb-4">{userMessage}</p>
+              </div>
+              
+              {!navigator.onLine && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-orange-700 font-medium">Network Status: Offline</p>
+                  <p className="text-xs text-orange-600">Please check your internet connection and try again.</p>
+                </div>
+              )}
+              
+              {errorCategory === 'chunk-loading' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-blue-700 font-medium">Loading Issue Detected</p>
+                  <p className="text-xs text-blue-600">The page component couldn't be downloaded. This is often temporary.</p>
+                </div>
+              )}
+              
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-left">
+                <p className="text-sm text-gray-700 font-medium mb-1">Technical Details:</p>
+                <p className="text-xs text-gray-600 break-all">{technicalDetails}</p>
                 {retryCount > 0 && (
-                  <p className="text-xs text-orange-600 mt-1">
+                  <p className="text-xs text-gray-500 mt-1">
                     Failed after {retryCount} retry attempts
                   </p>
                 )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Error Category: {errorCategory}
+                </p>
               </div>
+              
               <div className="flex flex-col space-y-2">
                 <button
                   onClick={() => window.location.reload()}
-                  className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90"
+                  className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   Refresh Page
                 </button>
                 <button
                   onClick={() => window.history.back()}
-                  className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600"
+                  className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
                 >
                   Go Back
+                </button>
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Return to Home
                 </button>
                 {import.meta.env.DEV && (
                   <button
                     onClick={() => console.log('Full error object:', error)}
-                    className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 text-sm"
+                    className="bg-red-100 text-red-700 px-6 py-2 rounded-lg hover:bg-red-200 text-sm transition-colors"
                   >
-                    Log Error to Console
+                    Log Error to Console (Debug)
                   </button>
                 )}
               </div>
@@ -205,7 +270,6 @@ const createLazyComponent = (importFn, componentName) => {
   };
 
   return React.lazy(loadWithRetry);
-};
 
 // Lazy load heavy components for better performance with error handling
 const AdminDashboard = createLazyComponent(() => import('@/components/pages/AdminDashboard'), 'Admin Dashboard');
