@@ -8,7 +8,7 @@ import { PersistGate } from "redux-persist/integration/react";
 import { addRealTimeNotification, setConnectionStatus, updateApprovalStatus } from "@/store/approvalWorkflowSlice";
 import { persistor, store } from "@/store/index";
 import { shouldRetry } from "@/utils/errorHandling";
-import webSocketService, { webSocketService } from "@/services/api/websocketService";
+import webSocketService from "@/services/api/websocketService";
 import Category from "@/components/pages/Category";
 import AIGenerate from "@/components/pages/AIGenerate";
 import PaymentManagement from "@/components/pages/PaymentManagement";
