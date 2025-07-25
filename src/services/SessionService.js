@@ -733,10 +733,172 @@ function createSessionService() {
 let sessionService;
 
 try {
+  // Ensure createSessionService function exists and is callable
+  if (typeof createSessionService !== 'function') {
+    throw new Error('createSessionService is not defined or not a function');
+  }
+  
   sessionService = createSessionService();
+  
+  // Validate the created service has required methods
+  if (!sessionService || typeof sessionService !== 'object') {
+    throw new Error('SessionService creation failed - invalid service object');
+  }
+  
 } catch (error) {
   console.error('Failed to initialize SessionService:', error);
-  sessionService = createSessionService(); // createSessionService already handles fallbacks  
+  
+  // Helper functions for fallback service
+  const createMinimalSessionFallback = () => {
+    const now = new Date();
+    const expiryTime = new Date();
+    expiryTime.setHours(expiryTime.getHours() + 24);
+    
+    return {
+      id: `session_${Date.now()}`,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      expiresAt: expiryTime.toISOString(),
+      lastActivity: now.toISOString(),
+      user: null,
+      token: null,
+      isEmergencySession: false
+    };
+  };
+  
+  const createGuestSessionFallback = async () => {
+    const guestSession = createMinimalSessionFallback();
+    guestSession.user = {
+      id: 'guest',
+      username: 'Guest User',
+      role: 'guest',
+      email: null,
+      isGuest: true,
+      permissions: ['read', 'browse_products']
+    };
+    guestSession.isEmergencySession = true;
+    
+    try {
+      localStorage.setItem('user_session', JSON.stringify(guestSession));
+    } catch (storageError) {
+      console.error('Failed to store guest session:', storageError);
+    }
+    
+    return guestSession;
+  };
+  
+  const isSessionExpiredFallback = (session) => {
+    try {
+      if (!session || !session.expiresAt) return true;
+      const expiryTime = new Date(session.expiresAt);
+      const currentTime = new Date();
+      return currentTime >= expiryTime;
+    } catch (error) {
+      return true;
+    }
+  };
+  
+  const clearStoredSessionFallback = () => {
+    try {
+      const keys = ['user_session', 'current_user', 'auth_token'];
+      keys.forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+      console.error('Failed to clear stored session:', error);
+    }
+  };
+  
+  // Create a minimal fallback service instead of retrying the same operation
+  sessionService = {
+    // Essential methods with safe implementations
+    async getCurrentSession() {
+      try {
+        return await createGuestSessionFallback();
+      } catch (err) {
+        console.error('Fallback getCurrentSession failed:', err);
+        return createMinimalSessionFallback();
+      }
+    },
+    
+    async isAuthenticated() {
+      try {
+        const session = await this.getCurrentSession();
+        return session && session.user && !isSessionExpiredFallback(session);
+      } catch (err) {
+        console.error('Fallback isAuthenticated failed:', err);
+        return false;
+      }
+    },
+    
+    async getCurrentUser() {
+      try {
+        const session = await this.getCurrentSession();
+        return session?.user || null;
+      } catch (err) {
+        console.error('Fallback getCurrentUser failed:', err);
+        return null;
+      }
+    },
+    
+    async getToken() {
+      try {
+        const session = await this.getCurrentSession();
+        return session?.token || null;
+      } catch (err) {
+        console.error('Fallback getToken failed:', err);
+        return null;
+      }
+    },
+    
+    clearSession() {
+      try {
+        clearStoredSessionFallback();
+      } catch (err) {
+        console.error('Fallback clearSession failed:', err);
+      }
+    },
+    
+    addListener(callback) {
+      // No-op fallback
+      console.warn('SessionService fallback: addListener not implemented');
+      return () => {}; // Return empty cleanup function
+    },
+    
+    removeListener(callback) {
+      // No-op fallback
+      console.warn('SessionService fallback: removeListener not implemented');
+    }
+  };
+  
+  // Log that we're using fallback service
+  console.warn('Using fallback SessionService due to initialization failure');
+}
+
+// Final validation to ensure sessionService is never undefined
+if (!sessionService) {
+  console.error('Critical: SessionService is still undefined after fallback creation');
+  sessionService = {
+    async getCurrentSession() { 
+      const now = new Date();
+      const expiryTime = new Date();
+      expiryTime.setHours(expiryTime.getHours() + 24);
+      return {
+        id: `session_${Date.now()}`,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        expiresAt: expiryTime.toISOString(),
+        lastActivity: now.toISOString(),
+        user: null,
+        token: null,
+        isEmergencySession: false
+      };
+    },
+    async isAuthenticated() { return false; },
+    async getCurrentUser() { return null; },
+    async getToken() { return null; },
+    clearSession() {},
+    addListener() { return () => {}; },
+    removeListener() {}
+  };
 }
 
 // Export singleton instance as default and class for flexibility
