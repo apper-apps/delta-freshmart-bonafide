@@ -619,17 +619,16 @@ class SessionService {
    */
   async validateSession(session = null) {
     try {
-      const sessionToValidate = session || this.currentSession;
+const sessionToValidate = session || this.currentSession;
       if (!sessionToValidate) {
         return false;
       }
       
       return this.validateSessionData(sessionToValidate) && !this.isSessionExpired(sessionToValidate);
-      
-    } catch (error) {
+} catch (error) {
       console.error('SessionService: Error validating session:', error);
       return false;
-}
+    }
   }
 }
 
@@ -663,7 +662,7 @@ try {
       } catch (e) {
         console.warn('Failed to clear session from storage:', e);
       }
-    },
+},
     isAuthenticated: async () => false,
     addListener: () => {},
     removeListener: () => {},
