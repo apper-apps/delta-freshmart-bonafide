@@ -714,8 +714,12 @@ function createSessionServiceInstance() {
   }
 }
 
-// Create and export singleton instance
+// Create and export the singleton instance
 const sessionService = createSessionServiceInstance();
+
+// Export both the class and the instance
+export { SessionService };
+export default sessionService;
 
 // Export both the class and instance
 export { SessionService };
