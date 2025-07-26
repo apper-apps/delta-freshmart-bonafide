@@ -1,5 +1,13 @@
 import { toast } from "react-hot-toast";
 import React from "react";
+import chatConversations from "@/services/mockData/chatConversations.json";
+import employees from "@/services/mockData/employees.json";
+import products from "@/services/mockData/products.json";
+import payroll from "@/services/mockData/payroll.json";
+import attendance from "@/services/mockData/attendance.json";
+import vendors from "@/services/mockData/vendors.json";
+import posTransactions from "@/services/mockData/posTransactions.json";
+import deliveryPersonnel from "@/services/mockData/deliveryPersonnel.json";
 import Error from "@/components/ui/Error";
 
 /**
@@ -82,19 +90,154 @@ class SessionService {
       toast.error('Failed to create session');
       return null;
     }
-  }
+}
 
   /**
-   * Get current session data
+   * Get current session data (legacy method)
    */
   getSession() {
     try {
       const sessionData = localStorage.getItem(this.SESSION_KEY);
-      return sessionData ? JSON.parse(sessionData) : null;
+      if (!sessionData) return null;
+      
+      const session = JSON.parse(sessionData);
+      return this.isSessionExpired(session) ? null : session;
     } catch (error) {
       console.error('Session retrieval error:', error);
       return null;
     }
+  }
+
+  /**
+   * Get current session with comprehensive data structure
+   * This is the method expected by App.jsx
+   */
+  async getCurrentSession() {
+    try {
+      const session = this.getSession();
+      const user = this.getCurrentUser();
+      
+      if (!session && !user) {
+        return null;
+      }
+
+      // If we have session data, return it in the expected format
+      if (session && session.user) {
+        return {
+          ...session,
+          sessionId: session.sessionId || `session_${Date.now()}`,
+          user: session.user,
+          isGuest: session.isGuest || session.user?.isGuest || false,
+          isMinimalSession: session.isMinimalSession || false,
+          isActive: session.isActive !== false
+        };
+      }
+
+      // If we only have user data, construct a session object
+      if (user) {
+        const sessionData = {
+          sessionId: `session_${Date.now()}`,
+          user: user,
+          token: this.getToken(),
+          loginTime: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + this.SESSION_DURATION).toISOString(),
+          isActive: true,
+          isGuest: user.isGuest || false,
+          isMinimalSession: false
+        };
+
+        // Store the constructed session
+        localStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionData));
+        return sessionData;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('getCurrentSession error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a guest session for fallback authentication
+   */
+  async createGuestSession() {
+    try {
+      const guestUser = {
+        id: `guest_${Date.now()}`,
+        name: 'Guest User',
+        email: null,
+        role: 'guest',
+        isGuest: true,
+        permissions: ['view_products', 'add_to_cart'],
+        settings: {
+          theme: 'light',
+          notifications: false,
+          language: 'en'
+        }
+      };
+
+      const sessionData = {
+        sessionId: `guest_session_${Date.now()}`,
+        user: guestUser,
+        token: null,
+        loginTime: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + this.SESSION_DURATION).toISOString(),
+        isActive: true,
+        isGuest: true,
+        isMinimalSession: true
+      };
+
+      // Store guest session
+      localStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionData));
+      localStorage.setItem(this.USER_KEY, JSON.stringify(guestUser));
+      localStorage.setItem(this.ROLE_KEY, 'guest');
+      localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(guestUser.permissions));
+      localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(guestUser.settings));
+
+      console.log('Guest session created successfully');
+      return sessionData;
+    } catch (error) {
+      console.error('Guest session creation error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Validate session data structure
+   */
+  validateSessionData(session) {
+    try {
+      if (!session || typeof session !== 'object') {
+        return false;
+      }
+
+      // Check required properties
+      const hasUser = session.user && typeof session.user === 'object';
+      const hasSessionId = session.sessionId && typeof session.sessionId === 'string';
+      const hasValidTimestamp = session.loginTime && !isNaN(new Date(session.loginTime).getTime());
+      
+      // Check user object structure
+      const hasUserId = session.user?.id;
+      const hasUserRole = session.user?.role;
+
+      // Session is valid if it has core required fields
+      const isValid = hasUser && hasSessionId && hasValidTimestamp && hasUserId && hasUserRole;
+
+      // Additional validation for non-guest sessions
+      if (!session.isGuest && !session.isMinimalSession) {
+        const hasToken = session.token && typeof session.token === 'string';
+        const hasExpirationTime = session.expiresAt && !isNaN(new Date(session.expiresAt).getTime());
+        const isNotExpired = session.expiresAt ? new Date(session.expiresAt) > new Date() : true;
+        
+        return isValid && hasToken && hasExpirationTime && isNotExpired;
+      }
+
+      return isValid;
+    } catch (error) {
+      console.error('Session validation error:', error);
+      return false;
+}
   }
 
   /**
@@ -390,9 +533,9 @@ class SessionService {
     try {
       this.clearSession();
       
-      if (showMessage) {
+if (showMessage) {
         toast.success('Logged out successfully');
-}
+      }
       
       // Redirect to login page or trigger app state update
       if (typeof window !== 'undefined' && window.CustomEvent) {
@@ -437,11 +580,12 @@ class SessionService {
       
       const session = this.createSession(mockUser, mockToken);
       
-      if (session) {
+if (session) {
         toast.success(`Welcome back, ${mockUser.name}!`);
-// Trigger session created event
+        
+        // Trigger session created event
         if (typeof window !== 'undefined' && window.CustomEvent) {
-          window.dispatchEvent(new CustomEvent('sessionCreated', { 
+          window.dispatchEvent(new CustomEvent('sessionCreated', {
             detail: { user: mockUser, session } 
           }));
         }
@@ -502,11 +646,9 @@ class SessionService {
     const handleSessionCleared = () => {
       callback('cleared', null);
     };
-
 if (typeof window !== 'undefined') {
       window.addEventListener('sessionCreated', handleSessionCreated);
       window.addEventListener('sessionCleared', handleSessionCleared);
-
       // Return cleanup function
       return () => {
         window.removeEventListener('sessionCreated', handleSessionCreated);
