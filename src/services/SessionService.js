@@ -6,11 +6,10 @@ import products from "@/services/mockData/products.json";
 import payroll from "@/services/mockData/payroll.json";
 import attendance from "@/services/mockData/attendance.json";
 import vendors from "@/services/mockData/vendors.json";
-import posTransactions from "@/services/mockData/posTransactions.json";
-import deliveryPersonnel from "@/services/mockData/deliveryPersonnel.json";
-import ErrorComponent from "@/components/ui/Error";
+import posTransactions from '@/services/mockData/posTransactions.json'
+import deliveryPersonnel from '@/services/mockData/deliveryPersonnel.json'
 
-// SessionService class for managing user sessions and authentication
+// Session management constants
 class SessionService {
   constructor() {
     this.sessionKey = 'freshmart_session';
