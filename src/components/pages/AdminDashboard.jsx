@@ -269,16 +269,20 @@ const ImageWithFallback = ({ src, alt, className, fallbackSrc = null, timeout = 
 }
 
 function AdminDashboard() {
+  // All hooks must be called at the top level before any conditional logic
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  
+  // Mobile Navigation Hook - MUST be first to prevent conditional calling
+  const { isMobileMenuOpen, activeTab, setActiveTab, toggleMobileMenu, closeMobileMenu } = useMobileNavigation();
+  
+  // Redux selectors
   const notificationCounts = useSelector(state => state.notifications.counts);
-const pendingApprovals = useSelector(selectPendingApprovals);
+  const pendingApprovals = useSelector(selectPendingApprovals);
   const approvalLoading = useSelector(selectApprovalLoading);
   const realTimeUpdates = useSelector(selectRealTimeUpdates);
   
-  // Mobile Navigation Hook - Must be called at top level before any conditional logic
-  const { isMobileMenuOpen, activeTab, setActiveTab, toggleMobileMenu, closeMobileMenu } = useMobileNavigation();
-  
+  // State hooks
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
