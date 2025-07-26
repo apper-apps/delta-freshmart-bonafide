@@ -434,15 +434,30 @@ function App() {
 } catch (error) {
         console.error('App: Session initialization failed:', error);
         
+        // Enhanced error categorization for SessionService issues
+        let errorCategory = 'unknown';
+        let shouldRetry = true;
+        
+        if (error.message?.includes('not a constructor') || error.message?.includes('_I is not a constructor')) {
+          errorCategory = 'service-instantiation';
+          shouldRetry = false; // Don't retry constructor errors
+          console.error('App: SessionService instantiation error - service may not be properly exported');
+        } else if (error.message?.includes('Session initialization timeout')) {
+          errorCategory = 'timeout';
+          shouldRetry = true;
+        } else if (error.message?.includes('Session validation failed')) {
+          errorCategory = 'validation';
+          shouldRetry = false;
+        }
+        
         if (mounted) {
           // Enhanced retry logic with better error categorization
-          const isRetryable = error.message !== 'Session initialization timeout' && 
-                             !error.message.includes('Session validation failed');
+          const isRetryable = shouldRetry && retryAttempts < maxRetries;
           
-          if (retryAttempts < maxRetries && isRetryable) {
+          if (isRetryable) {
             retryAttempts++;
             const delay = Math.min(1000 * Math.pow(2, retryAttempts), 5000);
-            console.log(`App: Retrying session initialization in ${delay}ms (attempt ${retryAttempts}/${maxRetries})`);
+            console.log(`App: Retrying session initialization in ${delay}ms (attempt ${retryAttempts}/${maxRetries}) - Error category: ${errorCategory}`);
             
             setTimeout(() => {
               if (mounted) {
@@ -452,12 +467,18 @@ function App() {
             return;
           }
           
-          // Enhanced fallback with guest session creation
+          // Enhanced fallback with service verification
           console.warn('App: Creating fallback session after initialization failure');
           try {
+            // Verify sessionService is available and has required methods
+            if (!sessionService || typeof sessionService.createGuestSession !== 'function') {
+              console.error('App: SessionService is not properly initialized');
+              throw new Error('SessionService unavailable');
+            }
+            
             // Attempt to create a guest session as fallback
             const fallbackSession = await sessionService.createGuestSession();
-            if (fallbackSession) {
+            if (fallbackSession && typeof fallbackSession === 'object') {
               setSessionReady(true);
               setSessionError(null);
               console.log('App: Fallback guest session created successfully');
@@ -467,16 +488,25 @@ function App() {
           } catch (fallbackError) {
             console.error('App: Fallback session creation failed:', fallbackError);
             // Final fallback - continue with error but don't block app
-            setSessionError(`Session initialization failed: ${error.message}. App will continue with limited functionality.`);
+            setSessionError(`Session service unavailable: ${error.message}. App will continue with limited functionality.`);
             setSessionReady(true); // Allow app to continue
             
             console.warn('App: Continuing without session - some features may be limited');
+            
+            // Add additional error context for debugging
+            console.error('App: Session service debug info:', {
+              sessionServiceType: typeof sessionService,
+              sessionServiceMethods: sessionService ? Object.getOwnPropertyNames(sessionService) : 'N/A',
+              errorCategory,
+              originalError: error.message,
+              fallbackError: fallbackError.message
+            });
           }
         }
         
-        // Track session errors for monitoring
+        // Track session errors for monitoring with enhanced context
         if (typeof window !== 'undefined' && window.performanceMonitor) {
-          window.performanceMonitor.trackError(error, 'session-initialization');
+          window.performanceMonitor.trackError(error, `session-initialization-${errorCategory}`);
         }
       }
     };

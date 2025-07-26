@@ -659,86 +659,57 @@ class SessionService {
   }
 }
 
+// Helper function for fallback service
+function createMinimalSession() {
+  const now = new Date();
+  const expiryTime = new Date();
+  expiryTime.setHours(expiryTime.getHours() + 24);
+  
+  return {
+    id: 'fallback-' + Date.now(),
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    expiresAt: expiryTime.toISOString(),
+    lastActivity: now.toISOString(),
+    user: { isGuest: true, role: 'guest', id: 'fallback-user' },
+    token: null,
+    isEmergencySession: true
+  };
+}
+
 // Create and export singleton instance
 let sessionService;
 try {
-  // Ensure SessionService class is available before instantiation
+// Ensure SessionService class is available before instantiation
   if (typeof SessionService === 'function') {
     sessionService = new SessionService();
+    console.log('SessionService: Instance created successfully');
   } else {
+    console.error('SessionService: Class not properly defined, type:', typeof SessionService);
     throw new Error('SessionService class not properly defined');
   }
 } catch (error) {
-  console.error('Failed to initialize SessionService:', error);
-  
-  // Create a comprehensive fallback service to prevent app crashes
+  console.error('SessionService: Failed to create instance:', error);
+  // Create a minimal fallback service to prevent app crash
   sessionService = {
-    async getCurrentSession() { 
-      console.warn('SessionService fallback: getCurrentSession called');
-      return {
-        sessionId: 'fallback-' + Date.now(),
-        user: { isGuest: true, role: 'guest', id: 'fallback-user' },
-        isGuest: true,
-        isMinimalSession: true
-      };
+    getCurrentSession: async () => {
+      console.warn('Using fallback session service');
+      return createMinimalSession();
     },
-    async createSession(userData, token = null) { 
-      console.warn('SessionService fallback: createSession called');
-      return null; 
-    },
-    async createGuestSession() {
-      console.warn('SessionService fallback: createGuestSession called');
-      return {
-        sessionId: 'fallback-guest-' + Date.now(),
-        user: { isGuest: true, role: 'guest', id: 'fallback-guest' },
-        isGuest: true,
-        isMinimalSession: true
-      };
-    },
-    async validateSession(session = null) { 
-      console.warn('SessionService fallback: validateSession called');
-      return false; 
-    },
-    validateSessionData(session) {
-      console.warn('SessionService fallback: validateSessionData called');
-      return !!(session && session.user);
-    },
-    async isAuthenticated() { 
-      console.warn('SessionService fallback: isAuthenticated called');
-      return false; 
-    },
-    async getCurrentUser() { 
-      console.warn('SessionService fallback: getCurrentUser called');
-      return { isGuest: true, role: 'guest', id: 'fallback-user' }; 
-    },
-    async getToken() { 
-      console.warn('SessionService fallback: getToken called');
-      return null; 
-    },
-    clearSession() {
-      console.warn('SessionService fallback: clearSession called');
-    },
-    async refreshSession(session = null) { 
-      console.warn('SessionService fallback: refreshSession called');
-      return null; 
-    },
-    async updateUser(userData) { 
-      console.warn('SessionService fallback: updateUser called');
-      return null; 
-    },
-    async getSessionInfo() { 
-      console.warn('SessionService fallback: getSessionInfo called');
-      return null; 
-    },
-    addListener(callback) {
-      console.warn('SessionService fallback: addListener called');
-    },
-    removeListener(callback) {
-      console.warn('SessionService fallback: removeListener called');
-    },
-    notifyListeners(event, data) {
-      console.warn('SessionService fallback: notifyListeners called');
-    }
+    createGuestSession: async () => createMinimalSession(),
+    validateSessionData: () => false,
+    isAuthenticated: async () => false,
+    getCurrentUser: async () => null,
+    getToken: async () => null,
+    createSession: async () => createMinimalSession(),
+    validateSession: async () => false,
+    updateUser: async () => false,
+    refreshSession: async () => createMinimalSession(),
+    clearSession: () => {},
+    storeSession: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    getSessionInfo: async () => ({ isGuest: true })
   };
 }
 
