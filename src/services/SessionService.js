@@ -740,8 +740,5 @@ const sessionServiceProxy = {
 export { SessionService };
 export default sessionServiceProxy;
 
-// Named export for the class
-export { SessionService };
-
 // Default export for the lazily-initialized instance
 export default sessionServiceProxy;
