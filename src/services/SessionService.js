@@ -1,3 +1,362 @@
+// SessionService.js - Comprehensive session management service
+class SessionService {
+  constructor() {
+    this.session = null;
+    this.listeners = [];
+    this.initialized = false;
+    this.storageKey = 'app_session';
+    this.sessionTimeout = 24 * 60 * 60 * 1000; // 24 hours
+    this.maxRetries = 3;
+    this.retryDelay = 1000;
+    
+    // Initialize service
+    this._ensureInitialized();
+  }
+
+  async _ensureInitialized() {
+    if (this.initialized) return;
+    
+    try {
+      // Initialize session from storage if available
+      const storedSession = this.getStoredSession();
+      if (storedSession && !this.isSessionExpired(storedSession)) {
+        this.session = storedSession;
+      }
+      this.initialized = true;
+    } catch (error) {
+      console.warn('SessionService: Initialization warning:', error);
+      this.initialized = true; // Continue even if storage fails
+    }
+  }
+
+  async initializeSession() {
+    await this._ensureInitialized();
+    
+    if (!this.session) {
+      // Create default guest session
+      this.session = await this.createGuestSession();
+    }
+    
+    return this.session;
+  }
+
+  validateSessionData(session) {
+    if (!session || typeof session !== 'object') return false;
+    
+    // Basic validation
+    if (!session.sessionId || !session.user) return false;
+    
+    // Check expiration
+    if (this.isSessionExpired(session)) return false;
+    
+    // Validate user object
+    if (!session.user.id && !session.isGuest) return false;
+    
+    return true;
+  }
+
+  isSessionExpired(session) {
+    if (!session || !session.expiresAt) return true;
+    
+    try {
+      const expirationTime = new Date(session.expiresAt).getTime();
+      return Date.now() > expirationTime;
+    } catch (error) {
+      return true; // Consider invalid dates as expired
+    }
+  }
+
+  getStoredSession() {
+    try {
+      const stored = localStorage.getItem(this.storageKey);
+      if (!stored) return null;
+      
+      const parsed = JSON.parse(stored);
+      return this.validateSessionData(parsed) ? parsed : null;
+    } catch (error) {
+      console.warn('SessionService: Error reading stored session:', error);
+      this.clearStoredSession();
+      return null;
+    }
+  }
+
+  clearStoredSession() {
+    try {
+      localStorage.removeItem(this.storageKey);
+    } catch (error) {
+      console.warn('SessionService: Error clearing stored session:', error);
+    }
+  }
+
+  isValidDate(dateString) {
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date);
+  }
+
+  async createGuestSession() {
+    const guestSession = {
+      sessionId: this.generateSessionId(),
+      user: {
+        id: `guest_${Date.now()}`,
+        name: 'Guest User',
+        role: 'guest',
+        isGuest: true,
+        permissions: this.getDefaultPermissions('guest')
+      },
+      isGuest: true,
+      isMinimalSession: true,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
+      lastActivity: new Date().toISOString()
+    };
+
+    this.session = guestSession;
+    this.storeSession(guestSession);
+    this.notifyListeners('session_created', guestSession);
+    
+    return guestSession;
+  }
+
+  createMinimalSession() {
+    return {
+      sessionId: this.generateSessionId(),
+      user: {
+        id: `minimal_${Date.now()}`,
+        name: 'Minimal User',
+        role: 'user',
+        isGuest: false,
+        permissions: this.getDefaultPermissions('user')
+      },
+      isGuest: false,
+      isMinimalSession: true,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
+      lastActivity: new Date().toISOString()
+    };
+  }
+
+  async getCurrentSession() {
+    await this._ensureInitialized();
+    
+    // Return existing session if valid
+    if (this.session && this.validateSessionData(this.session)) {
+      // Update last activity
+      this.session.lastActivity = new Date().toISOString();
+      this.storeSession(this.session);
+      return this.session;
+    }
+
+    // Try to restore from storage
+    const storedSession = this.getStoredSession();
+    if (storedSession) {
+      this.session = storedSession;
+      return storedSession;
+    }
+
+    // Create new guest session as fallback
+    return await this.createGuestSession();
+  }
+
+  async updateUser(userData) {
+    await this._ensureInitialized();
+    
+    if (!this.session) {
+      throw new Error('No active session to update');
+    }
+
+    this.session.user = {
+      ...this.session.user,
+      ...userData,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.session.lastActivity = new Date().toISOString();
+    this.storeSession(this.session);
+    this.notifyListeners('user_updated', this.session.user);
+
+    return this.session;
+  }
+
+  async refreshSession(session = null) {
+    const targetSession = session || this.session;
+    
+    if (!targetSession) {
+      return await this.createGuestSession();
+    }
+
+    // Extend expiration
+    const refreshedSession = {
+      ...targetSession,
+      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
+      lastActivity: new Date().toISOString(),
+      refreshedAt: new Date().toISOString()
+    };
+
+    this.session = refreshedSession;
+    this.storeSession(refreshedSession);
+    this.notifyListeners('session_refreshed', refreshedSession);
+
+    return refreshedSession;
+  }
+
+  clearSession() {
+    const oldSession = this.session;
+    this.session = null;
+    this.clearStoredSession();
+    this.notifyListeners('session_cleared', oldSession);
+  }
+
+  storeSession(session) {
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(session));
+    } catch (error) {
+      console.warn('SessionService: Error storing session:', error);
+      // Continue operation even if storage fails
+    }
+  }
+
+  generateSessionId() {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Event listener management
+  addListener(callback) {
+    if (typeof callback === 'function') {
+      this.listeners.push(callback);
+    }
+  }
+
+  removeListener(callback) {
+    this.listeners = this.listeners.filter(listener => listener !== callback);
+  }
+
+  notifyListeners(event, data) {
+    this.listeners.forEach(listener => {
+      try {
+        listener(event, data);
+      } catch (error) {
+        console.warn('SessionService: Error in event listener:', error);
+      }
+    });
+  }
+
+  // Additional utility methods
+  async getSessionInfo() {
+    const session = await this.getCurrentSession();
+    return {
+      isActive: !!session,
+      isGuest: session?.isGuest || false,
+      userId: session?.user?.id,
+      userRole: session?.user?.role,
+      sessionId: session?.sessionId,
+      expiresAt: session?.expiresAt,
+      isExpired: session ? this.isSessionExpired(session) : true
+    };
+  }
+
+  getDefaultPermissions(role) {
+    const permissions = {
+      guest: ['view_products', 'add_to_cart'],
+      user: ['view_products', 'add_to_cart', 'place_orders', 'view_orders'],
+      admin: ['*'] // All permissions
+    };
+    
+    return permissions[role] || permissions.guest;
+  }
+
+  async isAuthenticated() {
+    const session = await this.getCurrentSession();
+    return session && !session.isGuest && this.validateSessionData(session);
+  }
+
+  async getCurrentUser() {
+    const session = await this.getCurrentSession();
+    return session?.user || null;
+  }
+
+  async getToken() {
+    const session = await this.getCurrentSession();
+    return session?.token || session?.sessionId || null;
+  }
+
+  async createSession(userData, token = null) {
+    const newSession = {
+      sessionId: this.generateSessionId(),
+      user: {
+        ...userData,
+        permissions: this.getDefaultPermissions(userData.role || 'user')
+      },
+      token,
+      isGuest: false,
+      isMinimalSession: false,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
+      lastActivity: new Date().toISOString()
+    };
+
+    this.session = newSession;
+    this.storeSession(newSession);
+    this.notifyListeners('session_created', newSession);
+
+    return newSession;
+  }
+
+  async validateSession(session = null) {
+    const targetSession = session || this.session;
+    
+    if (!targetSession) return false;
+    
+    return this.validateSessionData(targetSession);
+  }
+}
+
+// Create fallback service for error scenarios
+function createFallbackService() {
+  return {
+    getCurrentSession: async () => ({
+      sessionId: `fallback_${Date.now()}`,
+      user: {
+        id: 'fallback_user',
+        name: 'Fallback User',
+        role: 'guest',
+        isGuest: true
+      },
+      isGuest: true,
+      isFallback: true,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600000).toISOString() // 1 hour
+    }),
+    createGuestSession: async function() {
+      return await this.getCurrentSession();
+    },
+    validateSessionData: () => true,
+    isAuthenticated: async () => false,
+    getCurrentUser: async () => null,
+    getToken: async () => null
+  };
+}
+
+// Singleton pattern to ensure single instance
+let sessionServiceInstance = null;
+
+function getSessionServiceInstance() {
+  if (!sessionServiceInstance) {
+    try {
+      sessionServiceInstance = new SessionService();
+    } catch (error) {
+      console.error('SessionService: Failed to create instance, using fallback:', error);
+      sessionServiceInstance = createFallbackService();
+    }
+  }
+  return sessionServiceInstance;
+}
+
+// Export the service instance
+const sessionServiceProxy = getSessionServiceInstance();
+
+// Named and default exports for flexibility
+export { SessionService };
+export default sessionServiceProxy;
 // SessionService - Pure JavaScript service for session management
 // No React dependencies - services should be framework-agnostic
 // SessionService - Pure JavaScript service for session management
@@ -797,7 +1156,6 @@ const sessionServiceProxy = {
 };
 
 // Export both named and default exports
-export { SessionService };
 export default sessionServiceProxy;
 
 // Default export for the lazily-initialized instance
