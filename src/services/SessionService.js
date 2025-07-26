@@ -1,5 +1,7 @@
 // SessionService - Pure JavaScript service for session management
 // No React dependencies - services should be framework-agnostic
+// SessionService - Pure JavaScript service for session management
+// No React dependencies - services should be framework-agnostic
 /**
  * SessionService - Comprehensive session management for the application
  * Handles user authentication, session persistence, and state management
@@ -659,24 +661,6 @@ class SessionService {
   }
 }
 
-// Helper function for fallback service
-function createMinimalSession() {
-  const now = new Date();
-  const expiryTime = new Date();
-  expiryTime.setHours(expiryTime.getHours() + 24);
-  
-  return {
-    id: 'fallback-' + Date.now(),
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-    expiresAt: expiryTime.toISOString(),
-    lastActivity: now.toISOString(),
-    user: { isGuest: true, role: 'guest', id: 'fallback-user' },
-    token: null,
-    isEmergencySession: true
-  };
-}
-
 // Create singleton instance function to avoid hoisting issues
 function createSessionServiceInstance() {
   try {
@@ -691,32 +675,15 @@ function createSessionServiceInstance() {
   } catch (error) {
     console.error('SessionService: Failed to create instance:', error);
     // Create a minimal fallback service to prevent app crash
-    return {
-      getCurrentSession: async () => {
-        console.warn('Using fallback session service');
-        return createMinimalSession();
-      },
-      createGuestSession: async () => createMinimalSession(),
-      validateSessionData: () => false,
-      isAuthenticated: async () => false,
-      getCurrentUser: async () => null,
-      getToken: async () => null,
-      createSession: async () => createMinimalSession(),
-      validateSession: async () => false,
-      updateUser: async () => false,
-      refreshSession: async () => createMinimalSession(),
-      clearSession: () => {},
-      storeSession: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      getSessionInfo: async () => ({ isGuest: true })
-    };
+    const fallbackService = new SessionService();
+    return fallbackService;
   }
 }
-
-// Create and export the singleton instance
+// Create and export the session service instance
 const sessionService = createSessionServiceInstance();
 
-// Export both the class and the instance
+// Named export for the class
 export { SessionService };
+
+// Default export for the instance
 export default sessionService;
