@@ -1,13 +1,14 @@
-import './index.css'
-import React, { useCallback, useEffect, useState } from "react";
+import '@/index.css'
+import React from "react";
 import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
-import { ToastContainer, toast } from "react-toastify";
+import { BrowserRouter } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import App from "@/App";
-import { classifyError } from "@/utils/errorHandling";
+import Error from "@/components/ui/Error";
 import { store } from "@/store/index";
-import ErrorComponent from "@/components/ui/Error";
-
 // Polyfill for structuredClone if not available
 if (typeof structuredClone === 'undefined') {
   window.structuredClone = function(obj) {
