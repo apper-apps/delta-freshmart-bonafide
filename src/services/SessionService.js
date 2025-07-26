@@ -677,41 +677,45 @@ function createMinimalSession() {
   };
 }
 
-// Create and export singleton instance
-let sessionService;
-try {
-// Ensure SessionService class is available before instantiation
-  if (typeof SessionService === 'function') {
-    sessionService = new SessionService();
-    console.log('SessionService: Instance created successfully');
-  } else {
-    console.error('SessionService: Class not properly defined, type:', typeof SessionService);
-    throw new Error('SessionService class not properly defined');
+// Create singleton instance function to avoid hoisting issues
+function createSessionServiceInstance() {
+  try {
+    // Ensure SessionService class is available before instantiation
+    if (typeof SessionService === 'function') {
+      console.log('SessionService: Instance created successfully');
+      return new SessionService();
+    } else {
+      console.error('SessionService: Class not properly defined, type:', typeof SessionService);
+      throw new Error('SessionService class not properly defined');
+    }
+  } catch (error) {
+    console.error('SessionService: Failed to create instance:', error);
+    // Create a minimal fallback service to prevent app crash
+    return {
+      getCurrentSession: async () => {
+        console.warn('Using fallback session service');
+        return createMinimalSession();
+      },
+      createGuestSession: async () => createMinimalSession(),
+      validateSessionData: () => false,
+      isAuthenticated: async () => false,
+      getCurrentUser: async () => null,
+      getToken: async () => null,
+      createSession: async () => createMinimalSession(),
+      validateSession: async () => false,
+      updateUser: async () => false,
+      refreshSession: async () => createMinimalSession(),
+      clearSession: () => {},
+      storeSession: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      getSessionInfo: async () => ({ isGuest: true })
+    };
   }
-} catch (error) {
-  console.error('SessionService: Failed to create instance:', error);
-  // Create a minimal fallback service to prevent app crash
-  sessionService = {
-    getCurrentSession: async () => {
-      console.warn('Using fallback session service');
-      return createMinimalSession();
-    },
-    createGuestSession: async () => createMinimalSession(),
-    validateSessionData: () => false,
-    isAuthenticated: async () => false,
-    getCurrentUser: async () => null,
-    getToken: async () => null,
-    createSession: async () => createMinimalSession(),
-    validateSession: async () => false,
-    updateUser: async () => false,
-    refreshSession: async () => createMinimalSession(),
-    clearSession: () => {},
-    storeSession: () => {},
-    addListener: () => {},
-    removeListener: () => {},
-    getSessionInfo: async () => ({ isGuest: true })
-  };
 }
+
+// Create and export singleton instance
+const sessionService = createSessionServiceInstance();
 
 // Export both the class and instance
 export { SessionService };
