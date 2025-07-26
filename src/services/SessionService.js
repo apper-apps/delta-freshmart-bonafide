@@ -8,7 +8,7 @@ import attendance from "@/services/mockData/attendance.json";
 import vendors from "@/services/mockData/vendors.json";
 import posTransactions from "@/services/mockData/posTransactions.json";
 import deliveryPersonnel from "@/services/mockData/deliveryPersonnel.json";
-import Error from "@/components/ui/Error";
+import ErrorComponent from "@/components/ui/Error";
 
 // SessionService class for managing user sessions and authentication
 class SessionService {
