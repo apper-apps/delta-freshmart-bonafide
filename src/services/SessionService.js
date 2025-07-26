@@ -741,4 +741,3 @@ export { SessionService };
 export default sessionServiceProxy;
 
 // Default export for the lazily-initialized instance
-export default sessionServiceProxy;
