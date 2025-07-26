@@ -1,1161 +1,525 @@
-// SessionService.js - Comprehensive session management service
-class SessionService {
-  constructor() {
-    this.session = null;
-    this.listeners = [];
-    this.initialized = false;
-    this.storageKey = 'app_session';
-    this.sessionTimeout = 24 * 60 * 60 * 1000; // 24 hours
-    this.maxRetries = 3;
-    this.retryDelay = 1000;
-    
-    // Initialize service
-    this._ensureInitialized();
-  }
+import { toast } from "react-hot-toast";
+import React from "react";
+import Error from "@/components/ui/Error";
 
-  async _ensureInitialized() {
-    if (this.initialized) return;
-    
-    try {
-      // Initialize session from storage if available
-      const storedSession = this.getStoredSession();
-      if (storedSession && !this.isSessionExpired(storedSession)) {
-        this.session = storedSession;
-      }
-      this.initialized = true;
-    } catch (error) {
-      console.warn('SessionService: Initialization warning:', error);
-      this.initialized = true; // Continue even if storage fails
-    }
-  }
-
-  async initializeSession() {
-    await this._ensureInitialized();
-    
-    if (!this.session) {
-      // Create default guest session
-      this.session = await this.createGuestSession();
-    }
-    
-    return this.session;
-  }
-
-  validateSessionData(session) {
-    if (!session || typeof session !== 'object') return false;
-    
-    // Basic validation
-    if (!session.sessionId || !session.user) return false;
-    
-    // Check expiration
-    if (this.isSessionExpired(session)) return false;
-    
-    // Validate user object
-    if (!session.user.id && !session.isGuest) return false;
-    
-    return true;
-  }
-
-  isSessionExpired(session) {
-    if (!session || !session.expiresAt) return true;
-    
-    try {
-      const expirationTime = new Date(session.expiresAt).getTime();
-      return Date.now() > expirationTime;
-    } catch (error) {
-      return true; // Consider invalid dates as expired
-    }
-  }
-
-  getStoredSession() {
-    try {
-      const stored = localStorage.getItem(this.storageKey);
-      if (!stored) return null;
-      
-      const parsed = JSON.parse(stored);
-      return this.validateSessionData(parsed) ? parsed : null;
-    } catch (error) {
-      console.warn('SessionService: Error reading stored session:', error);
-      this.clearStoredSession();
-      return null;
-    }
-  }
-
-  clearStoredSession() {
-    try {
-      localStorage.removeItem(this.storageKey);
-    } catch (error) {
-      console.warn('SessionService: Error clearing stored session:', error);
-    }
-  }
-
-  isValidDate(dateString) {
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date);
-  }
-
-  async createGuestSession() {
-    const guestSession = {
-      sessionId: this.generateSessionId(),
-      user: {
-        id: `guest_${Date.now()}`,
-        name: 'Guest User',
-        role: 'guest',
-        isGuest: true,
-        permissions: this.getDefaultPermissions('guest')
-      },
-      isGuest: true,
-      isMinimalSession: true,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
-      lastActivity: new Date().toISOString()
-    };
-
-    this.session = guestSession;
-    this.storeSession(guestSession);
-    this.notifyListeners('session_created', guestSession);
-    
-    return guestSession;
-  }
-
-  createMinimalSession() {
-    return {
-      sessionId: this.generateSessionId(),
-      user: {
-        id: `minimal_${Date.now()}`,
-        name: 'Minimal User',
-        role: 'user',
-        isGuest: false,
-        permissions: this.getDefaultPermissions('user')
-      },
-      isGuest: false,
-      isMinimalSession: true,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
-      lastActivity: new Date().toISOString()
-    };
-  }
-
-  async getCurrentSession() {
-    await this._ensureInitialized();
-    
-    // Return existing session if valid
-    if (this.session && this.validateSessionData(this.session)) {
-      // Update last activity
-      this.session.lastActivity = new Date().toISOString();
-      this.storeSession(this.session);
-      return this.session;
-    }
-
-    // Try to restore from storage
-    const storedSession = this.getStoredSession();
-    if (storedSession) {
-      this.session = storedSession;
-      return storedSession;
-    }
-
-    // Create new guest session as fallback
-    return await this.createGuestSession();
-  }
-
-  async updateUser(userData) {
-    await this._ensureInitialized();
-    
-    if (!this.session) {
-      throw new Error('No active session to update');
-    }
-
-    this.session.user = {
-      ...this.session.user,
-      ...userData,
-      updatedAt: new Date().toISOString()
-    };
-
-    this.session.lastActivity = new Date().toISOString();
-    this.storeSession(this.session);
-    this.notifyListeners('user_updated', this.session.user);
-
-    return this.session;
-  }
-
-  async refreshSession(session = null) {
-    const targetSession = session || this.session;
-    
-    if (!targetSession) {
-      return await this.createGuestSession();
-    }
-
-    // Extend expiration
-    const refreshedSession = {
-      ...targetSession,
-      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
-      lastActivity: new Date().toISOString(),
-      refreshedAt: new Date().toISOString()
-    };
-
-    this.session = refreshedSession;
-    this.storeSession(refreshedSession);
-    this.notifyListeners('session_refreshed', refreshedSession);
-
-    return refreshedSession;
-  }
-
-  clearSession() {
-    const oldSession = this.session;
-    this.session = null;
-    this.clearStoredSession();
-    this.notifyListeners('session_cleared', oldSession);
-  }
-
-  storeSession(session) {
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(session));
-    } catch (error) {
-      console.warn('SessionService: Error storing session:', error);
-      // Continue operation even if storage fails
-    }
-  }
-
-  generateSessionId() {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  // Event listener management
-  addListener(callback) {
-    if (typeof callback === 'function') {
-      this.listeners.push(callback);
-    }
-  }
-
-  removeListener(callback) {
-    this.listeners = this.listeners.filter(listener => listener !== callback);
-  }
-
-  notifyListeners(event, data) {
-    this.listeners.forEach(listener => {
-      try {
-        listener(event, data);
-      } catch (error) {
-        console.warn('SessionService: Error in event listener:', error);
-      }
-    });
-  }
-
-  // Additional utility methods
-  async getSessionInfo() {
-    const session = await this.getCurrentSession();
-    return {
-      isActive: !!session,
-      isGuest: session?.isGuest || false,
-      userId: session?.user?.id,
-      userRole: session?.user?.role,
-      sessionId: session?.sessionId,
-      expiresAt: session?.expiresAt,
-      isExpired: session ? this.isSessionExpired(session) : true
-    };
-  }
-
-  getDefaultPermissions(role) {
-    const permissions = {
-      guest: ['view_products', 'add_to_cart'],
-      user: ['view_products', 'add_to_cart', 'place_orders', 'view_orders'],
-      admin: ['*'] // All permissions
-    };
-    
-    return permissions[role] || permissions.guest;
-  }
-
-  async isAuthenticated() {
-    const session = await this.getCurrentSession();
-    return session && !session.isGuest && this.validateSessionData(session);
-  }
-
-  async getCurrentUser() {
-    const session = await this.getCurrentSession();
-    return session?.user || null;
-  }
-
-  async getToken() {
-    const session = await this.getCurrentSession();
-    return session?.token || session?.sessionId || null;
-  }
-
-  async createSession(userData, token = null) {
-    const newSession = {
-      sessionId: this.generateSessionId(),
-      user: {
-        ...userData,
-        permissions: this.getDefaultPermissions(userData.role || 'user')
-      },
-      token,
-      isGuest: false,
-      isMinimalSession: false,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + this.sessionTimeout).toISOString(),
-      lastActivity: new Date().toISOString()
-    };
-
-    this.session = newSession;
-    this.storeSession(newSession);
-    this.notifyListeners('session_created', newSession);
-
-    return newSession;
-  }
-
-  async validateSession(session = null) {
-    const targetSession = session || this.session;
-    
-    if (!targetSession) return false;
-    
-    return this.validateSessionData(targetSession);
-  }
-}
-
-// Create fallback service for error scenarios
-function createFallbackService() {
-  return {
-    getCurrentSession: async () => ({
-      sessionId: `fallback_${Date.now()}`,
-      user: {
-        id: 'fallback_user',
-        name: 'Fallback User',
-        role: 'guest',
-        isGuest: true
-      },
-      isGuest: true,
-      isFallback: true,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 3600000).toISOString() // 1 hour
-    }),
-    createGuestSession: async function() {
-      return await this.getCurrentSession();
-    },
-    validateSessionData: () => true,
-    isAuthenticated: async () => false,
-    getCurrentUser: async () => null,
-    getToken: async () => null
-  };
-}
-
-// Singleton pattern to ensure single instance
-let sessionServiceInstance = null;
-
-function getSessionServiceInstance() {
-  if (!sessionServiceInstance) {
-    try {
-      sessionServiceInstance = new SessionService();
-    } catch (error) {
-      console.error('SessionService: Failed to create instance, using fallback:', error);
-      sessionServiceInstance = createFallbackService();
-    }
-  }
-  return sessionServiceInstance;
-}
-
-// Export the service instance
-const sessionServiceProxy = getSessionServiceInstance();
-
-// Named and default exports for flexibility
-export { SessionService };
-export default sessionServiceProxy;
-// SessionService - Pure JavaScript service for session management
-// No React dependencies - services should be framework-agnostic
-// SessionService - Pure JavaScript service for session management
-// No React dependencies - services should be framework-agnostic
 /**
- * SessionService - Comprehensive session management for the application
- * Handles user authentication, session persistence, and state management
+ * SessionService - Comprehensive session management service
+ * Handles user authentication, session persistence, and role-based access
  */
 class SessionService {
   constructor() {
-    this.currentSession = null;
-    this.listeners = [];
-    this.isInitializing = false;
-    this.storageKeys = {
-      session: 'user_session',
-      user: 'current_user',
-      token: 'auth_token'
-    };
+    this.SESSION_KEY = 'freshmart_session';
+    this.USER_KEY = 'freshmart_user';
+    this.TOKEN_KEY = 'freshmart_token';
+    this.ROLE_KEY = 'freshmart_user_role';
+    this.PERMISSIONS_KEY = 'freshmart_permissions';
+    this.SETTINGS_KEY = 'freshmart_user_settings';
     
-    // Initialize on first access instead of constructor
-    this._initialized = false;
-    this._initializing = false;
+    // Session expiration (24 hours default)
+    this.SESSION_DURATION = 24 * 60 * 60 * 1000;
+    
+    // Initialize session check
+    this.initializeSession();
   }
-  
-  // Ensure initialization before any operation
-  async _ensureInitialized() {
-    if (this._initialized) return;
-    if (this._initializing) return;
-    
+
+  /**
+   * Initialize session on service creation
+   */
+  initializeSession() {
     try {
-      this._initializing = true;
-      await this.initializeSession();
-      this._initialized = true;
+      const session = this.getSession();
+      if (session && this.isSessionExpired(session)) {
+        this.clearSession();
+        toast.error('Session expired. Please log in again.');
+      }
     } catch (error) {
-      console.error('SessionService: Delayed initialization failed:', error);
-      // Set basic fallback state
-      this.currentSession = this.createMinimalSession();
-      this._initialized = true;
-    } finally {
-      this._initializing = false;
+      console.error('Session initialization error:', error);
+      this.clearSession();
     }
   }
 
   /**
-   * Initialize session from storage or create new one
+   * Create and store user session
    */
-  async initializeSession() {
-    if (this.isInitializing) return this.currentSession;
-    
-    this.isInitializing = true;
-    
+  createSession(userData, token = null) {
     try {
-      console.log('SessionService: Initializing session...');
-      
-      // Try to recover from storage first
-      const storedSession = this.getStoredSession();
-      
-      if (storedSession && this.validateSessionData(storedSession)) {
-        if (!this.isSessionExpired(storedSession)) {
-          this.currentSession = storedSession;
-          this.refreshSession();
-          console.log('SessionService: Session recovered from storage');
-        } else {
-          console.log('SessionService: Stored session expired, creating new one');
-          await this.createGuestSession();
-        }
-      } else {
-        console.log('SessionService: No valid stored session, creating new one');
-        await this.createGuestSession();
+      if (!userData || !userData.id) {
+        throw new Error('Invalid user data provided');
       }
-      
-      return this.currentSession;
-      
-    } catch (error) {
-      console.error('SessionService: Error during initialization:', error);
-      // Fallback to minimal session without async operations
-      try {
-        await this.createGuestSession();
-      } catch (guestError) {
-        console.error('SessionService: Guest session creation failed:', guestError);
-        this.currentSession = this.createMinimalSession();
-      }
-      return this.currentSession;
-    } finally {
-      this.isInitializing = false;
-    }
-  }
 
-  /**
-   * Validate session data structure and required fields
-   * @param {Object} session - Session object to validate
-   * @returns {boolean} True if session is valid
-   */
-  validateSessionData(session) {
-    try {
-      if (!session || typeof session !== 'object') {
-        return false;
-      }
-      
-      // Check required fields
-      const requiredFields = ['id', 'createdAt', 'expiresAt', 'user'];
-      for (const field of requiredFields) {
-        if (!session[field]) {
-          console.warn(`SessionService: Missing required field: ${field}`);
-          return false;
-        }
-      }
-      
-      // Validate user object
-      if (!session.user || typeof session.user !== 'object') {
-        console.warn('SessionService: Invalid user object');
-        return false;
-      }
-      
-      // Validate dates
-      if (!this.isValidDate(session.createdAt) || !this.isValidDate(session.expiresAt)) {
-        console.warn('SessionService: Invalid date fields');
-        return false;
-      }
-      
-      return true;
-      
-    } catch (error) {
-      console.error('SessionService: Error validating session:', error);
-      return false;
-    }
-  }
+      const sessionData = {
+        user: userData,
+        token: token,
+        loginTime: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + this.SESSION_DURATION).toISOString(),
+        isActive: true
+      };
 
-  /**
-   * Check if session has expired
-   * @param {Object} session - Session to check
-   * @returns {boolean} True if expired
-   */
-  isSessionExpired(session) {
-    try {
-      if (!session || !session.expiresAt) {
-        return true;
+      // Store session data
+      localStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionData));
+      localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+      
+      if (token) {
+        localStorage.setItem(this.TOKEN_KEY, token);
       }
       
-      const expiryTime = new Date(session.expiresAt);
-      const currentTime = new Date();
-      
-      return currentTime >= expiryTime;
-      
-    } catch (error) {
-      console.error('SessionService: Error checking expiry:', error);
-      return true; // Assume expired on error
-    }
-  }
+      if (userData.role) {
+        localStorage.setItem(this.ROLE_KEY, userData.role);
+      }
 
-  /**
-   * Get stored session from localStorage
-   * @returns {Object|null} Stored session or null
-   */
-  getStoredSession() {
-    try {
-      const sessionData = localStorage.getItem(this.storageKeys.session);
-      if (!sessionData) {
-        return null;
+      if (userData.permissions) {
+        localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(userData.permissions));
       }
-      
-      const session = JSON.parse(sessionData);
-      return session;
-      
+
+      // Store user preferences
+      if (userData.settings) {
+        localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(userData.settings));
+      }
+
+      return sessionData;
     } catch (error) {
-      console.error('SessionService: Error retrieving stored session:', error);
+      console.error('Session creation error:', error);
+      toast.error('Failed to create session');
       return null;
     }
   }
 
   /**
-   * Clear stored session data
+   * Get current session data
    */
-  clearStoredSession() {
+  getSession() {
     try {
-      Object.values(this.storageKeys).forEach(key => {
-        localStorage.removeItem(key);
-      });
-      console.log('SessionService: Stored session cleared');
+      const sessionData = localStorage.getItem(this.SESSION_KEY);
+      return sessionData ? JSON.parse(sessionData) : null;
     } catch (error) {
-      console.error('SessionService: Error clearing stored session:', error);
+      console.error('Session retrieval error:', error);
+      return null;
     }
   }
 
   /**
-   * Validate if a string is a valid date
-   * @param {string} dateString - Date string to validate
-   * @returns {boolean} True if valid date
+   * Get current user data
    */
-  isValidDate(dateString) {
+  getCurrentUser() {
     try {
-      const date = new Date(dateString);
-      return date instanceof Date && !isNaN(date.getTime());
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Create a guest session for unauthenticated users
-   * @returns {Promise<Object>} Created session
-   */
-  async createGuestSession() {
-    try {
-      console.log('SessionService: Creating guest session');
-      
-      const guestSession = this.createMinimalSession();
-      guestSession.user = {
-        id: 'guest',
-        username: 'Guest User',
-        role: 'guest',
-        email: null,
-        isGuest: true,
-        permissions: this.getDefaultPermissions('guest')
-      };
-      guestSession.isEmergencySession = true;
-      
-      this.currentSession = guestSession;
-      this.storeSession(guestSession);
-      
-      this.notifyListeners('session_created', { 
-        session: guestSession,
-        type: 'guest'
-      });
-      
-      console.log('SessionService: Guest session created successfully');
-      return guestSession;
-      
+      const userData = localStorage.getItem(this.USER_KEY);
+      return userData ? JSON.parse(userData) : null;
     } catch (error) {
-      console.error('SessionService: Error creating guest session:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create minimal session structure
-   * @returns {Object} Basic session object
-   */
-  createMinimalSession() {
-    const now = new Date();
-    const expiryTime = new Date();
-    expiryTime.setHours(expiryTime.getHours() + 24); // 24 hour expiry
-    
-    return {
-      id: this.generateSessionId(),
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      expiresAt: expiryTime.toISOString(),
-      lastActivity: now.toISOString(),
-      user: null,
-      token: null,
-      isEmergencySession: false
-    };
-  }
-
-  /**
-   * Get current active session
-   * @returns {Promise<Object|null>} Current session or null
-   */
-  async getCurrentSession() {
-    try {
-      // If we have a current session, validate it
-      if (this.currentSession) {
-        if (this.validateSessionData(this.currentSession) && !this.isSessionExpired(this.currentSession)) {
-          // Update last activity
-          this.currentSession.lastActivity = new Date().toISOString();
-          return this.currentSession;
-        } else {
-          console.log('SessionService: Current session invalid or expired');
-          this.currentSession = null;
-        }
-      }
-      
-      // Try to initialize from storage
-      await this.initializeSession();
-      return this.currentSession;
-      
-    } catch (error) {
-      console.error('SessionService: Critical error in getCurrentSession:', error);
-      // Create emergency session as fallback
-      try {
-        await this.createGuestSession();
-        return this.currentSession;
-      } catch (fallbackError) {
-        console.error('SessionService: Failed to create fallback session:', fallbackError);
-        return null;
-      }
-    }
-  }
-
-  /**
-   * Update user data in current session
-   * @param {Object} userData - User data to update
-   * @returns {Promise<Object>} Updated session
-   */
-  async updateUser(userData) {
-    try {
-      const session = await this.getCurrentSession();
-      if (!session) {
-        throw new Error('No active session to update');
-      }
-
-      // Update user data
-      session.user = {
-        ...session.user,
-        ...userData
-      };
-      session.updatedAt = new Date().toISOString();
-      session.lastActivity = new Date().toISOString();
-      
-      // Store updated session
-      this.currentSession = session;
-      this.storeSession(session);
-      
-      // Notify listeners
-      this.notifyListeners('user_updated', { 
-        session: session,
-        userData 
-      });
-      
-      console.log('SessionService: User updated successfully');
-      return session;
-
-    } catch (error) {
-      console.error('SessionService: Error updating user:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Refresh session expiry and activity
-   * @param {Object} session - Optional session to refresh
-   * @returns {Promise<Object>} Refreshed session
-   */
-  async refreshSession(session = null) {
-    try {
-      const sessionToRefresh = session || this.currentSession;
-      if (!sessionToRefresh) {
-        throw new Error('No session to refresh');
-      }
-
-      // Extend expiry by 24 hours
-      const newExpiryTime = new Date();
-      newExpiryTime.setHours(newExpiryTime.getHours() + 24);
-      
-      sessionToRefresh.expiresAt = newExpiryTime.toISOString();
-      sessionToRefresh.updatedAt = new Date().toISOString();
-      sessionToRefresh.lastActivity = new Date().toISOString();
-      
-      // Store refreshed session
-      this.storeSession(sessionToRefresh);
-      this.currentSession = sessionToRefresh;
-      
-      console.log('SessionService: Session refreshed successfully');
-      this.notifyListeners('session_refreshed', { session: sessionToRefresh });
-      
-      return sessionToRefresh;
-
-    } catch (error) {
-      console.error('SessionService: Error refreshing session:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Clear current session and storage
-   */
-  clearSession() {
-    try {
-      console.log('SessionService: Clearing session');
-      
-      const oldSession = this.currentSession;
-      this.currentSession = null;
-      this.clearStoredSession();
-      
-      this.notifyListeners('session_cleared', { 
-        previousSession: oldSession 
-      });
-      
-    } catch (error) {
-      console.error('SessionService: Error clearing session:', error);
-    }
-  }
-
-  /**
-   * Store session data to localStorage
-   * @param {Object} session - Session to store
-   */
-  storeSession(session) {
-    try {
-      if (!session || typeof session !== 'object') {
-        console.warn('SessionService: Invalid session provided for storage');
-        return;
-      }
-      
-      const sessionData = JSON.stringify(session);
-      localStorage.setItem(this.storageKeys.session, sessionData);
-      
-      // Store user and token separately for easy access
-      if (session.user) {
-        localStorage.setItem(this.storageKeys.user, JSON.stringify(session.user));
-      }
-      if (session.token) {
-        localStorage.setItem(this.storageKeys.token, session.token);
-      }
-      
-      console.log('SessionService: Session stored successfully');
-      
-    } catch (error) {
-      console.error('SessionService: Error storing session:', error);
-      // Don't throw - storage failure shouldn't break the app
-    }
-  }
-
-  /**
-   * Generate unique session ID
-   * @returns {string} Unique session ID
-   */
-  generateSessionId() {
-    try {
-      const timestamp = Date.now().toString();
-      const random = Math.random().toString(36).substring(2, 15);
-      const additional = Math.random().toString(36).substring(2, 15);
-      return `${timestamp}_${random}_${additional}`;
-    } catch (error) {
-      console.error('SessionService: Error generating session ID:', error);
-      // Fallback to simple timestamp
-      return `session_${Date.now()}`;
-    }
-  }
-
-  /**
-   * Add session event listener
-   * @param {Function} callback - Callback function
-   * @returns {Function} Unsubscribe function
-   */
-  addListener(callback) {
-    try {
-      if (typeof callback !== 'function') {
-        throw new Error('Callback must be a function');
-      }
-      
-      this.listeners.push(callback);
-      console.log('SessionService: Listener added');
-      
-      // Return unsubscribe function
-      return () => this.removeListener(callback);
-      
-    } catch (error) {
-      console.error('SessionService: Error adding listener:', error);
-      return () => {}; // Return no-op function
-    }
-  }
-
-  /**
-   * Remove session event listener
-   * @param {Function} callback - Callback to remove
-   */
-  removeListener(callback) {
-    try {
-      const index = this.listeners.indexOf(callback);
-      if (index > -1) {
-        this.listeners.splice(index, 1);
-        console.log('SessionService: Listener removed');
-      }
-    } catch (error) {
-      console.error('SessionService: Error removing listener:', error);
-    }
-  }
-
-  /**
-   * Notify all listeners of session events
-   * @param {string} event - Event type
-   * @param {Object} data - Event data
-   */
-  notifyListeners(event, data) {
-    try {
-      this.listeners.forEach(callback => {
-        try {
-          callback(event, data);
-        } catch (error) {
-          console.error('SessionService: Error in listener callback:', error);
-        }
-      });
-    } catch (error) {
-      console.error('SessionService: Error notifying listeners:', error);
-    }
-  }
-
-  /**
-   * Get comprehensive session information
-   * @returns {Promise<Object>} Session information
-   */
-  async getSessionInfo() {
-    try {
-      const current = this.currentSession;
-      const stored = this.getStoredSession();
-      
-      const session = await this.getCurrentSession();
-      if (!session) {
-        return { 
-          status: 'No active session',
-          error: 'Failed to retrieve or create session',
-          hasCurrentSession: !!current,
-          hasStoredSession: !!stored,
-          isInitializing: this.isInitializing,
-          listenerCount: this.listeners.length
-        };
-      }
-
-      return {
-        status: 'Active',
-        user: session.user?.username || 'Unknown',
-        role: session.user?.role || 'Unknown',
-        createdAt: session.createdAt,
-        lastActivity: session.lastActivity,
-        expiresAt: session.expiresAt,
-        isExpired: this.isSessionExpired(session),
-        isEmergencySession: session.isEmergencySession || false,
-        hasCurrentSession: !!current,
-        hasStoredSession: !!stored,
-        currentSessionValid: current ? this.validateSessionData(current) : false,
-        currentSessionExpired: current ? this.isSessionExpired(current) : null,
-        storedSessionValid: stored ? this.validateSessionData(stored) : false,
-        storedSessionExpired: stored ? this.isSessionExpired(stored) : null,
-        isInitializing: this.isInitializing,
-        listenerCount: this.listeners.length
-      };
-    } catch (error) {
-      console.error('SessionService: Error getting session info:', error);
-      return { status: 'Error', error: error.message };
-    }
-  }
-
-  /**
-   * Get default permissions based on user role
-   * @param {string} role - User role
-   * @returns {Array} Default permissions
-   */
-  getDefaultPermissions(role) {
-    const permissionSets = {
-      admin: [
-        'read', 'write', 'delete', 'manage_users', 'manage_products',
-        'manage_orders', 'view_analytics', 'manage_payments', 'system_config'
-      ],
-      manager: [
-        'read', 'write', 'manage_products', 'manage_orders', 
-        'view_analytics', 'manage_payments'
-      ],
-      employee: [
-        'read', 'write', 'manage_orders', 'process_payments'
-      ],
-      vendor: [
-        'read', 'write', 'manage_own_products', 'view_own_orders'
-      ],
-      customer: [
-        'read', 'place_orders', 'view_own_orders', 'manage_profile'
-      ],
-      guest: [
-        'read', 'browse_products'
-      ]
-    };
-    
-    return permissionSets[role] || permissionSets.guest;
-  }
-
-  /**
-   * Check if user is authenticated
-   * @returns {Promise<boolean>} True if authenticated
-   */
-  async isAuthenticated() {
-    try {
-      const session = await this.getCurrentSession();
-      return !!(session && session.user && !session.user.isGuest);
-    } catch (error) {
-      console.error('SessionService: Error checking authentication:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get current user
-   * @returns {Promise<Object|null>} Current user or null
-   */
-  async getCurrentUser() {
-    try {
-      const session = await this.getCurrentSession();
-      return session?.user || null;
-    } catch (error) {
-      console.error('SessionService: Error getting current user:', error);
+      console.error('User data retrieval error:', error);
       return null;
     }
   }
 
   /**
    * Get authentication token
-   * @returns {Promise<string|null>} Auth token or null
    */
-  async getToken() {
+  getToken() {
     try {
-      const session = await this.getCurrentSession();
-      return session?.token || null;
+      return localStorage.getItem(this.TOKEN_KEY);
     } catch (error) {
-      console.error('SessionService: Error getting token:', error);
+      console.error('Token retrieval error:', error);
       return null;
     }
   }
 
   /**
-   * Create authenticated user session
-   * @param {Object} userData - User data
-   * @param {string} token - Authentication token
-   * @returns {Promise<Object>} Created session
+   * Get user role
    */
-  async createSession(userData, token = null) {
+  getUserRole() {
     try {
-      console.log('SessionService: Creating authenticated session');
-      
-      const session = this.createMinimalSession();
-      session.user = {
-        ...userData,
-        permissions: this.getDefaultPermissions(userData.role)
-      };
-      session.token = token;
-      session.isEmergencySession = false;
-      
-      this.currentSession = session;
-      this.storeSession(session);
-      
-      this.notifyListeners('session_created', { 
-        session: session,
-        type: 'authenticated'
-      });
-      
-      console.log('SessionService: Authenticated session created successfully');
-      return session;
-      
+      return localStorage.getItem(this.ROLE_KEY);
     } catch (error) {
-      console.error('SessionService: Error creating session:', error);
-      throw error;
+      console.error('Role retrieval error:', error);
+      return null;
     }
   }
 
   /**
-   * Validate existing session
-   * @param {Object} session - Session to validate
-   * @returns {Promise<boolean>} True if valid
-*/
-  async validateSession(session = null) {
+   * Get user permissions
+   */
+  getUserPermissions() {
     try {
-      const sessionToValidate = session || this.currentSession;
-      if (!sessionToValidate) {
+      const permissions = localStorage.getItem(this.PERMISSIONS_KEY);
+      return permissions ? JSON.parse(permissions) : [];
+    } catch (error) {
+      console.error('Permissions retrieval error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get user settings
+   */
+  getUserSettings() {
+    try {
+      const settings = localStorage.getItem(this.SETTINGS_KEY);
+      return settings ? JSON.parse(settings) : {};
+    } catch (error) {
+      console.error('Settings retrieval error:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Update user data in session
+   */
+  updateUser(userData) {
+    try {
+      if (!userData) {
+        throw new Error('User data is required');
+      }
+
+      const session = this.getSession();
+      if (!session) {
+        throw new Error('No active session found');
+      }
+
+      // Update session with new user data
+      session.user = { ...session.user, ...userData };
+      localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(this.USER_KEY, JSON.stringify(session.user));
+
+      // Update role if provided
+      if (userData.role) {
+        localStorage.setItem(this.ROLE_KEY, userData.role);
+      }
+
+      // Update permissions if provided
+      if (userData.permissions) {
+        localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(userData.permissions));
+      }
+
+      return session.user;
+    } catch (error) {
+      console.error('User update error:', error);
+      toast.error('Failed to update user data');
+      return null;
+    }
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  isAuthenticated() {
+    try {
+      const session = this.getSession();
+      if (!session || !session.isActive) {
         return false;
       }
-      
-      return this.validateSessionData(sessionToValidate) && !this.isSessionExpired(sessionToValidate);
+
+      if (this.isSessionExpired(session)) {
+        this.clearSession();
+        return false;
+      }
+
+      return true;
     } catch (error) {
-      console.error('SessionService: Error validating session:', error);
+      console.error('Authentication check error:', error);
       return false;
     }
   }
-}
 
-// Singleton instance holder
-let sessionServiceInstance = null;
-
-// Create fallback service to prevent constructor errors
-const createFallbackService = () => ({
-  getCurrentSession: async () => null,
-  getCurrentUser: async () => null,
-  getToken: async () => null,
-  isAuthenticated: async () => false,
-  createSession: async () => null,
-  clearSession: () => {},
-  validateSession: async () => false,
-  addListener: () => {},
-  removeListener: () => {},
-  getSessionInfo: async () => ({ isValid: false, user: null })
-});
-
-// Lazy initialization function to avoid hoisting issues
-function getSessionServiceInstance() {
-  if (!sessionServiceInstance) {
+  /**
+   * Check if session has expired
+   */
+  isSessionExpired(session = null) {
     try {
-      // Ensure SessionService class is properly defined and available
-      if (typeof SessionService === 'function' && SessionService.prototype) {
-        console.log('SessionService: Creating instance...');
-        sessionServiceInstance = new SessionService();
-        console.log('SessionService: Instance created successfully');
-      } else {
-        console.error('SessionService: Class not properly defined, type:', typeof SessionService);
-        sessionServiceInstance = createFallbackService();
-        console.warn('SessionService: Using fallback service due to class initialization error');
+      const sessionData = session || this.getSession();
+      if (!sessionData || !sessionData.expiresAt) {
+        return true;
       }
+
+      const expirationTime = new Date(sessionData.expiresAt).getTime();
+      const currentTime = new Date().getTime();
+      
+      return currentTime > expirationTime;
     } catch (error) {
-      console.error('SessionService: Failed to create instance:', error);
-      sessionServiceInstance = createFallbackService();
-      console.warn('SessionService: Using fallback service due to error:', error.message);
+      console.error('Session expiration check error:', error);
+      return true;
     }
   }
-  return sessionServiceInstance;
+
+  /**
+   * Extend session expiration
+   */
+  extendSession(additionalTime = null) {
+    try {
+      const session = this.getSession();
+      if (!session) {
+        return false;
+      }
+
+      const extension = additionalTime || this.SESSION_DURATION;
+      session.expiresAt = new Date(Date.now() + extension).toISOString();
+      
+      localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+      return true;
+    } catch (error) {
+      console.error('Session extension error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if user has specific role
+   */
+  hasRole(role) {
+    try {
+      if (!role) return false;
+      
+      const userRole = this.getUserRole();
+      return userRole === role;
+    } catch (error) {
+      console.error('Role check error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if user has specific permission
+   */
+  hasPermission(permission) {
+    try {
+      if (!permission) return false;
+      
+      const permissions = this.getUserPermissions();
+      return Array.isArray(permissions) && permissions.includes(permission);
+    } catch (error) {
+      console.error('Permission check error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if user has any of the specified roles
+   */
+  hasAnyRole(roles) {
+    try {
+      if (!Array.isArray(roles) || roles.length === 0) return false;
+      
+      const userRole = this.getUserRole();
+      return roles.includes(userRole);
+    } catch (error) {
+      console.error('Multiple role check error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update user settings
+   */
+  updateUserSettings(settings) {
+    try {
+      if (!settings || typeof settings !== 'object') {
+        throw new Error('Invalid settings provided');
+      }
+
+      const currentSettings = this.getUserSettings();
+      const updatedSettings = { ...currentSettings, ...settings };
+      
+      localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(updatedSettings));
+      
+      // Also update in session if exists
+      const session = this.getSession();
+      if (session && session.user) {
+        session.user.settings = updatedSettings;
+        localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+        localStorage.setItem(this.USER_KEY, JSON.stringify(session.user));
+      }
+
+      return updatedSettings;
+    } catch (error) {
+      console.error('Settings update error:', error);
+      toast.error('Failed to update settings');
+      return null;
+    }
+  }
+
+  /**
+   * Get session duration remaining
+   */
+  getSessionTimeRemaining() {
+    try {
+      const session = this.getSession();
+      if (!session || !session.expiresAt) {
+        return 0;
+      }
+
+      const expirationTime = new Date(session.expiresAt).getTime();
+      const currentTime = new Date().getTime();
+      const remaining = expirationTime - currentTime;
+      
+      return Math.max(0, remaining);
+    } catch (error) {
+      console.error('Session time check error:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Clear all session data
+   */
+  clearSession() {
+    try {
+      localStorage.removeItem(this.SESSION_KEY);
+      localStorage.removeItem(this.USER_KEY);
+      localStorage.removeItem(this.TOKEN_KEY);
+      localStorage.removeItem(this.ROLE_KEY);
+      localStorage.removeItem(this.PERMISSIONS_KEY);
+      localStorage.removeItem(this.SETTINGS_KEY);
+      
+      // Clear any other session-related data
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('freshmart_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Session clear error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Logout user and clear session
+   */
+  logout(showMessage = true) {
+    try {
+      this.clearSession();
+      
+      if (showMessage) {
+        toast.success('Logged out successfully');
+}
+      
+      // Redirect to login page or trigger app state update
+      if (typeof window !== 'undefined' && window.CustomEvent) {
+        window.dispatchEvent(new CustomEvent('sessionCleared'));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Logout error:', error);
+      if (showMessage) {
+        toast.error('Error during logout');
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Login user with credentials
+   */
+  async login(credentials) {
+    try {
+      if (!credentials || !credentials.email) {
+        throw new Error('Email is required');
+      }
+
+      // This would typically make an API call
+      // For now, using mock authentication
+      const mockUser = {
+        id: 1,
+        email: credentials.email,
+        name: credentials.name || 'User',
+        role: credentials.role || 'customer',
+        permissions: credentials.permissions || [],
+        settings: {
+          theme: 'light',
+          notifications: true,
+          language: 'en'
+        }
+      };
+
+      const mockToken = 'mock_jwt_token_' + Date.now();
+      
+      const session = this.createSession(mockUser, mockToken);
+      
+      if (session) {
+        toast.success(`Welcome back, ${mockUser.name}!`);
+// Trigger session created event
+        if (typeof window !== 'undefined' && window.CustomEvent) {
+          window.dispatchEvent(new CustomEvent('sessionCreated', { 
+            detail: { user: mockUser, session } 
+          }));
+        }
+        
+        return { user: mockUser, token: mockToken, session };
+      }
+      
+      throw new Error('Failed to create session');
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error(error.message || 'Login failed');
+      return null;
+    }
+  }
+
+  /**
+   * Get session info for debugging
+   */
+  getSessionInfo() {
+    try {
+      const session = this.getSession();
+      const user = this.getCurrentUser();
+      const token = this.getToken();
+      const role = this.getUserRole();
+      const permissions = this.getUserPermissions();
+      const settings = this.getUserSettings();
+      
+      return {
+        hasSession: !!session,
+        isAuthenticated: this.isAuthenticated(),
+        isExpired: session ? this.isSessionExpired(session) : true,
+        timeRemaining: this.getSessionTimeRemaining(),
+        user: user,
+        role: role,
+        permissions: permissions,
+        settings: settings,
+        hasToken: !!token
+      };
+    } catch (error) {
+      console.error('Session info error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Subscribe to session changes
+   */
+  onSessionChange(callback) {
+    if (typeof callback !== 'function') {
+      console.error('Session change callback must be a function');
+      return null;
+    }
+
+    const handleSessionCreated = (event) => {
+      callback('created', event.detail);
+    };
+
+    const handleSessionCleared = () => {
+      callback('cleared', null);
+    };
+
+if (typeof window !== 'undefined') {
+      window.addEventListener('sessionCreated', handleSessionCreated);
+      window.addEventListener('sessionCleared', handleSessionCleared);
+
+      // Return cleanup function
+      return () => {
+        window.removeEventListener('sessionCreated', handleSessionCreated);
+        window.removeEventListener('sessionCleared', handleSessionCleared);
+      };
+    }
+
+    // Return no-op cleanup function for non-browser environments
+    return () => {};
+  }
 }
 
-// Create safe proxy object for default export
-const sessionServiceProxy = {
-  // Getter methods - properly bound to maintain 'this' context
-  get getCurrentSession() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.getCurrentSession.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting getCurrentSession:', error);
-      return async () => null;
-    }
-  },
-  get getCurrentUser() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.getCurrentUser.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting getCurrentUser:', error);
-      return async () => null;
-    }
-  },
-  get getToken() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.getToken.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting getToken:', error);
-      return async () => null;
-    }
-  },
-  get isAuthenticated() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.isAuthenticated.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting isAuthenticated:', error);
-      return async () => false;
-    }
-  },
-  get createSession() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.createSession.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting createSession:', error);
-      return async () => null;
-    }
-  },
-  get clearSession() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.clearSession.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting clearSession:', error);
-      return () => {};
-    }
-  },
-  get validateSession() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.validateSession.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting validateSession:', error);
-      return async () => false;
-    }
-  },
-  get addListener() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.addListener.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting addListener:', error);
-      return () => {};
-    }
-  },
-  get removeListener() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.removeListener.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting removeListener:', error);
-      return () => {};
-    }
-  },
-  get getSessionInfo() {
-    try {
-      const instance = getSessionServiceInstance();
-      return instance.getSessionInfo.bind(instance);
-    } catch (error) {
-      console.error('SessionService: Error getting getSessionInfo:', error);
-      return async () => ({});
-    }
-  }
-};
+// Create and export singleton instance
+const sessionService = new SessionService();
 
-// Export both named and default exports
-export default sessionServiceProxy;
-
-// Default export for the lazily-initialized instance
+export default sessionService;
