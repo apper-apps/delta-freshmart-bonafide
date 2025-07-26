@@ -272,9 +272,12 @@ function AdminDashboard() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const notificationCounts = useSelector(state => state.notifications.counts);
-  const pendingApprovals = useSelector(selectPendingApprovals);
+const pendingApprovals = useSelector(selectPendingApprovals);
   const approvalLoading = useSelector(selectApprovalLoading);
   const realTimeUpdates = useSelector(selectRealTimeUpdates);
+  
+  // Mobile Navigation Hook - Must be called at top level before any conditional logic
+  const { isMobileMenuOpen, activeTab, setActiveTab, toggleMobileMenu, closeMobileMenu } = useMobileNavigation();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -908,8 +911,6 @@ const priorityConfig = {
   high: { color: 'bg-orange-500', text: 'High', textColor: 'text-orange-600' },
   medium: { color: 'bg-blue-500', text: 'Medium', textColor: 'text-blue-600' }
 };
-
-const { isMobileMenuOpen, activeTab, setActiveTab, toggleMobileMenu, closeMobileMenu } = useMobileNavigation();
 
   return (
     <div className="min-h-screen bg-background">
