@@ -661,29 +661,66 @@ class SessionService {
   }
 }
 
-// Create singleton instance function to avoid hoisting issues
-function createSessionServiceInstance() {
-  try {
-    // Ensure SessionService class is available before instantiation
-    if (typeof SessionService === 'function') {
-      console.log('SessionService: Instance created successfully');
-      return new SessionService();
-    } else {
-      console.error('SessionService: Class not properly defined, type:', typeof SessionService);
-      throw new Error('SessionService class not properly defined');
+// Singleton instance holder
+let sessionServiceInstance = null;
+
+// Lazy initialization function to avoid hoisting issues
+function getSessionServiceInstance() {
+  if (!sessionServiceInstance) {
+    try {
+      // Ensure SessionService class is available before instantiation
+      if (typeof SessionService === 'function') {
+        console.log('SessionService: Instance created successfully');
+        sessionServiceInstance = new SessionService();
+      } else {
+        console.error('SessionService: Class not properly defined, type:', typeof SessionService);
+        // Create minimal fallback object to prevent app crash
+        sessionServiceInstance = {
+          getCurrentSession: async () => null,
+          getCurrentUser: async () => null,
+          getToken: async () => null,
+          isAuthenticated: async () => false,
+          createSession: async () => null,
+          clearSession: () => {},
+          validateSession: async () => false,
+          addListener: () => {},
+          removeListener: () => {},
+          getSessionInfo: async () => ({ isValid: false, user: null })
+        };
+        console.warn('SessionService: Using fallback service due to initialization error');
+      }
+    } catch (error) {
+      console.error('SessionService: Failed to create instance:', error);
+      // Create minimal fallback service to prevent app crash
+      sessionServiceInstance = {
+        getCurrentSession: async () => null,
+        getCurrentUser: async () => null,
+        getToken: async () => null,
+        isAuthenticated: async () => false,
+        createSession: async () => null,
+        clearSession: () => {},
+        validateSession: async () => false,
+        addListener: () => {},
+        removeListener: () => {},
+        getSessionInfo: async () => ({ isValid: false, user: null })
+      };
+      console.warn('SessionService: Using fallback service due to error:', error.message);
     }
-  } catch (error) {
-    console.error('SessionService: Failed to create instance:', error);
-    // Create a minimal fallback service to prevent app crash
-    const fallbackService = new SessionService();
-    return fallbackService;
   }
+  return sessionServiceInstance;
 }
-// Create and export the session service instance
-const sessionService = createSessionServiceInstance();
+
+// Create proxy object for default export to enable lazy initialization
+const sessionServiceProxy = new Proxy({}, {
+  get(target, prop) {
+    const instance = getSessionServiceInstance();
+    const value = instance[prop];
+    return typeof value === 'function' ? value.bind(instance) : value;
+  }
+});
 
 // Named export for the class
 export { SessionService };
 
-// Default export for the instance
-export default sessionService;
+// Default export for the lazily-initialized instance
+export default sessionServiceProxy;
