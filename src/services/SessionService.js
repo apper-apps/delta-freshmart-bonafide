@@ -703,36 +703,96 @@ function getSessionServiceInstance() {
 
 // Create safe proxy object for default export
 const sessionServiceProxy = {
-  // Getter methods
+  // Getter methods - properly bound to maintain 'this' context
   get getCurrentSession() {
-    return getSessionServiceInstance().getCurrentSession;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.getCurrentSession.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting getCurrentSession:', error);
+      return async () => null;
+    }
   },
   get getCurrentUser() {
-    return getSessionServiceInstance().getCurrentUser;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.getCurrentUser.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting getCurrentUser:', error);
+      return async () => null;
+    }
   },
   get getToken() {
-    return getSessionServiceInstance().getToken;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.getToken.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting getToken:', error);
+      return async () => null;
+    }
   },
   get isAuthenticated() {
-    return getSessionServiceInstance().isAuthenticated;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.isAuthenticated.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting isAuthenticated:', error);
+      return async () => false;
+    }
   },
   get createSession() {
-    return getSessionServiceInstance().createSession;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.createSession.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting createSession:', error);
+      return async () => null;
+    }
   },
   get clearSession() {
-    return getSessionServiceInstance().clearSession;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.clearSession.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting clearSession:', error);
+      return () => {};
+    }
   },
   get validateSession() {
-    return getSessionServiceInstance().validateSession;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.validateSession.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting validateSession:', error);
+      return async () => false;
+    }
   },
   get addListener() {
-    return getSessionServiceInstance().addListener;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.addListener.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting addListener:', error);
+      return () => {};
+    }
   },
   get removeListener() {
-    return getSessionServiceInstance().removeListener;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.removeListener.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting removeListener:', error);
+      return () => {};
+    }
   },
   get getSessionInfo() {
-    return getSessionServiceInstance().getSessionInfo;
+    try {
+      const instance = getSessionServiceInstance();
+      return instance.getSessionInfo.bind(instance);
+    } catch (error) {
+      console.error('SessionService: Error getting getSessionInfo:', error);
+      return async () => ({});
+    }
   }
 };
 
