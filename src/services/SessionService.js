@@ -381,23 +381,3 @@ class SessionService {
 const sessionService = new SessionService();
 
 export default sessionService;
-}
-}
-  }
-if (showMessage) {
-        toast.success('Logged out successfully');
-      }
-      
-      // Redirect to login page or trigger app state update
-      if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
-        window.dispatchEvent(new window.CustomEvent('sessionCleared'));
-      }
-if (session) {
-        toast.success(`Welcome back, ${mockUser.name}!`);
-        
-        // Trigger session created event
-        if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
-          window.dispatchEvent(new window.CustomEvent('sessionCreated', {
-            detail: { user: mockUser, session } 
-          }));
-        }
