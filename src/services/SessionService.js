@@ -720,6 +720,3 @@ const sessionService = createSessionServiceInstance();
 // Export both the class and the instance
 export { SessionService };
 export default sessionService;
-
-// Export the service instance as default
-export default sessionService;
