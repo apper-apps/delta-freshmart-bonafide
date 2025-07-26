@@ -664,60 +664,81 @@ class SessionService {
 // Singleton instance holder
 let sessionServiceInstance = null;
 
+// Create fallback service to prevent constructor errors
+const createFallbackService = () => ({
+  getCurrentSession: async () => null,
+  getCurrentUser: async () => null,
+  getToken: async () => null,
+  isAuthenticated: async () => false,
+  createSession: async () => null,
+  clearSession: () => {},
+  validateSession: async () => false,
+  addListener: () => {},
+  removeListener: () => {},
+  getSessionInfo: async () => ({ isValid: false, user: null })
+});
+
 // Lazy initialization function to avoid hoisting issues
 function getSessionServiceInstance() {
   if (!sessionServiceInstance) {
     try {
-      // Ensure SessionService class is available before instantiation
-      if (typeof SessionService === 'function') {
-        console.log('SessionService: Instance created successfully');
+      // Ensure SessionService class is properly defined and available
+      if (typeof SessionService === 'function' && SessionService.prototype) {
+        console.log('SessionService: Creating instance...');
         sessionServiceInstance = new SessionService();
+        console.log('SessionService: Instance created successfully');
       } else {
         console.error('SessionService: Class not properly defined, type:', typeof SessionService);
-        // Create minimal fallback object to prevent app crash
-        sessionServiceInstance = {
-          getCurrentSession: async () => null,
-          getCurrentUser: async () => null,
-          getToken: async () => null,
-          isAuthenticated: async () => false,
-          createSession: async () => null,
-          clearSession: () => {},
-          validateSession: async () => false,
-          addListener: () => {},
-          removeListener: () => {},
-          getSessionInfo: async () => ({ isValid: false, user: null })
-        };
-        console.warn('SessionService: Using fallback service due to initialization error');
+        sessionServiceInstance = createFallbackService();
+        console.warn('SessionService: Using fallback service due to class initialization error');
       }
     } catch (error) {
       console.error('SessionService: Failed to create instance:', error);
-      // Create minimal fallback service to prevent app crash
-      sessionServiceInstance = {
-        getCurrentSession: async () => null,
-        getCurrentUser: async () => null,
-        getToken: async () => null,
-        isAuthenticated: async () => false,
-        createSession: async () => null,
-        clearSession: () => {},
-        validateSession: async () => false,
-        addListener: () => {},
-        removeListener: () => {},
-        getSessionInfo: async () => ({ isValid: false, user: null })
-      };
+      sessionServiceInstance = createFallbackService();
       console.warn('SessionService: Using fallback service due to error:', error.message);
     }
   }
   return sessionServiceInstance;
 }
 
-// Create proxy object for default export to enable lazy initialization
-const sessionServiceProxy = new Proxy({}, {
-  get(target, prop) {
-    const instance = getSessionServiceInstance();
-    const value = instance[prop];
-    return typeof value === 'function' ? value.bind(instance) : value;
+// Create safe proxy object for default export
+const sessionServiceProxy = {
+  // Getter methods
+  get getCurrentSession() {
+    return getSessionServiceInstance().getCurrentSession;
+  },
+  get getCurrentUser() {
+    return getSessionServiceInstance().getCurrentUser;
+  },
+  get getToken() {
+    return getSessionServiceInstance().getToken;
+  },
+  get isAuthenticated() {
+    return getSessionServiceInstance().isAuthenticated;
+  },
+  get createSession() {
+    return getSessionServiceInstance().createSession;
+  },
+  get clearSession() {
+    return getSessionServiceInstance().clearSession;
+  },
+  get validateSession() {
+    return getSessionServiceInstance().validateSession;
+  },
+  get addListener() {
+    return getSessionServiceInstance().addListener;
+  },
+  get removeListener() {
+    return getSessionServiceInstance().removeListener;
+  },
+  get getSessionInfo() {
+    return getSessionServiceInstance().getSessionInfo;
   }
-});
+};
+
+// Export both named and default exports
+export { SessionService };
+export default sessionServiceProxy;
 
 // Named export for the class
 export { SessionService };
