@@ -22,6 +22,117 @@ import Button from "@/components/atoms/Button";
 import Error from "@/components/ui/Error";
 import Loading from "@/components/ui/Loading";
 
+// Mobile Navigation Hook
+const useMobileNavigation = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  
+  return {
+    isMobileMenuOpen,
+    activeTab,
+    setActiveTab,
+    toggleMobileMenu,
+    closeMobileMenu
+  };
+};
+
+// Mobile Navigation Component
+const MobileNavigation = ({ isOpen, onClose, activeTab, onTabChange, quickActions, notificationCounts }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
+      
+      {/* Navigation Panel */}
+      <div className="fixed inset-y-0 left-0 w-80 bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Admin Dashboard</h2>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
+              style={{ minHeight: '48px', minWidth: '48px' }}
+            >
+              <ApperIcon name="X" size={24} />
+            </button>
+          </div>
+          
+          {/* Navigation Items */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="space-y-2">
+              {quickActions.map((action) => {
+                const badgeCount = notificationCounts[action.notificationKey] || 0;
+                
+                return action.isAction ? (
+                  <button
+                    key={action.path}
+                    onClick={() => {
+                      if (action.path === '/order-summary') {
+                        // Handle order summary action
+                      }
+                      onClose();
+                    }}
+                    className="w-full flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors touch-manipulation"
+                    style={{ minHeight: '64px' }}
+                  >
+                    <div className={`relative bg-gradient-to-r ${action.color} p-3 rounded-lg`}>
+                      <ApperIcon name={action.icon} size={20} className="text-white" />
+                      {badgeCount > 0 && (
+                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <span className="font-medium text-gray-900 block text-base">
+                        {action.label}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {action.priority} Priority
+                      </span>
+                    </div>
+                  </button>
+                ) : (
+                  <Link
+                    key={action.path}
+                    to={action.path}
+                    onClick={onClose}
+                    className="w-full flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors touch-manipulation"
+                    style={{ minHeight: '64px' }}
+                  >
+                    <div className={`relative bg-gradient-to-r ${action.color} p-3 rounded-lg`}>
+                      <ApperIcon name={action.icon} size={20} className="text-white" />
+                      {badgeCount > 0 && (
+                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <span className="font-medium text-gray-900 block text-base">
+                        {action.label}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {action.priority} Priority
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Enhanced image loading utilities with timeout and retry support
 const ImageWithFallback = ({ src, alt, className, fallbackSrc = null, timeout = 10000, ...props }) => {
   const [imageSrc, setImageSrc] = useState(src)
@@ -798,223 +909,345 @@ const priorityConfig = {
   medium: { color: 'bg-blue-500', text: 'Medium', textColor: 'text-blue-600' }
 };
 
+const { isMobileMenuOpen, activeTab, setActiveTab, toggleMobileMenu, closeMobileMenu } = useMobileNavigation();
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-gray-600">Manage your FreshMart store</p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-xl">
-<div className="flex items-center justify-between">
-<div>
-              <p className="text-green-100 text-sm">Wallet Balance</p>
-              <p className="text-2xl font-bold">Rs. {(stats?.walletBalance || 0).toLocaleString()}</p>
-            </div>
-            <ApperIcon name="Wallet" size={32} className="text-green-100" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-6 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm">Total Transactions</p>
-              <p className="text-2xl font-bold">{(stats?.totalTransactions || 0).toLocaleString()}</p>
-            </div>
-            <ApperIcon name="CreditCard" size={32} className="text-blue-100" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-xl">
-          <div className="flex items-center justify-between">
-<div>
-              <p className="text-purple-100 text-sm">Monthly Revenue</p>
-              <p className="text-2xl font-bold">Rs. {(stats?.monthlyRevenue || 0).toLocaleString()}</p>
-            </div>
-            <ApperIcon name="TrendingUp" size={32} className="text-purple-100" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-6 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-orange-100 text-sm">Pending Verifications</p>
-              <p className="text-2xl font-bold">{(stats?.pendingVerifications || 0).toLocaleString()}</p>
-            </div>
-            <ApperIcon name="Clock" size={32} className="text-orange-100" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6 rounded-xl">
-          <div className="flex items-center justify-between">
-<div>
-              <p className="text-emerald-100 text-sm">Today's Revenue</p>
-              <p className="text-2xl font-bold">Rs. {(stats?.todayRevenue || 0).toLocaleString()}</p>
-            </div>
-            <ApperIcon name="DollarSign" size={32} className="text-emerald-100" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-6 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-violet-100 text-sm">Today's Orders</p>
-              <p className="text-2xl font-bold">{(todayOrders?.length || 0).toLocaleString()}</p>
-            </div>
-            <ApperIcon name="ShoppingCart" size={32} className="text-violet-100" />
-          </div>
+    <div className="min-h-screen bg-background">
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button
+            onClick={toggleMobileMenu}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
+            style={{ minHeight: '48px', minWidth: '48px' }}
+          >
+            <ApperIcon name="Menu" size={24} />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-900">Admin Dashboard</h1>
+          <div className="w-12" /> {/* Spacer for alignment */}
         </div>
       </div>
 
-      {/* Quick Actions and Recent Orders */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-{/* Quick Actions */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Quick Actions</h2>
-            <div className="flex items-center space-x-2 text-xs">
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span className="text-gray-600">Critical</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                <span className="text-gray-600">High</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-gray-600">Medium</span>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-{quickActions.map((action) => {
-              const badgeCount = notificationCounts[action.notificationKey] || 0;
-              const priorityInfo = priorityConfig[action.priority];
-              
-              return (
-action.isAction ? (
-                  <button
-                    key={action.path}
-                    onClick={() => {
-                      if (action.path === '#vendor-control') {
-                        setShowVendorControl(!showVendorControl);
-                      } else if (action.path === '/order-summary') {
-                        handleOrderSummaryClick();
-                      }
-                    }}
-                    className="group w-full text-left"
-                  >
-                    <div className="relative p-4 rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all duration-200">
-                      {/* Priority indicator */}
-                      <div className="absolute top-2 right-2 flex items-center space-x-1">
-                        <div className={`w-2 h-2 ${priorityInfo.color} rounded-full`}></div>
-                        <span className={`text-xs font-medium ${priorityInfo.textColor}`}>
-                          {priorityInfo.text}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3 mt-2">
-                        <div className={`relative bg-gradient-to-r ${action.color} p-2 rounded-lg`}>
-                          <ApperIcon name={action.icon} size={20} className="text-white" />
-                          {badgeCount > 0 && (
-                            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
-                              {badgeCount > 99 ? '99+' : badgeCount}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-medium text-gray-900 group-hover:text-primary transition-colors block">
-                            {action.label}
-                          </span>
-                          <span className={`text-xs ${priorityInfo.textColor} opacity-75`}>
-                            {priorityInfo.text} Priority
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ) : (
-                  <Link
-                    key={action.path}
-                    to={action.path}
-                    className="group"
-                    onClick={() => handleTabClick(action.path)}
-                  >
-                    <div className="relative p-4 rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all duration-200">
-                      {/* Priority indicator */}
-                      <div className="absolute top-2 right-2 flex items-center space-x-1">
-                        <div className={`w-2 h-2 ${priorityInfo.color} rounded-full`}></div>
-                        <span className={`text-xs font-medium ${priorityInfo.textColor}`}>
-                          {priorityInfo.text}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3 mt-2">
-                        <div className={`relative bg-gradient-to-r ${action.color} p-2 rounded-lg`}>
-                          <ApperIcon name={action.icon} size={20} className="text-white" />
-                          {badgeCount > 0 && (
-                            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
-                              {badgeCount > 99 ? '99+' : badgeCount}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-medium text-gray-900 group-hover:text-primary transition-colors block">
-                            {action.label}
-                          </span>
-                          <span className={`text-xs ${priorityInfo.textColor} opacity-75`}>
-                            {priorityInfo.text} Priority
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                )
-              );
-            })}
-          </div>
+      {/* Mobile Navigation */}
+      <MobileNavigation
+        isOpen={isMobileMenuOpen}
+        onClose={closeMobileMenu}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        quickActions={quickActions}
+        notificationCounts={notificationCounts}
+      />
+
+      {/* Main Content */}
+      <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-8 lg:max-w-7xl lg:mx-auto">
+        {/* Desktop Header */}
+        <div className="hidden lg:block mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600">Manage your FreshMart store</p>
         </div>
 
-        {/* Recent Orders */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Orders</h2>
-            <Link to="/orders" className="text-primary hover:text-primary-dark transition-colors">
-              View All
-            </Link>
-          </div>
-          
-          {recentOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <ApperIcon name="Package" size={48} className="text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No recent orders</p>
+        {/* Stats Cards - Mobile Responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 lg:gap-6 mb-6 lg:mb-8">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-4 lg:p-6 rounded-xl touch-manipulation">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-xs sm:text-sm">Wallet Balance</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold">Rs. {(stats?.walletBalance || 0).toLocaleString()}</p>
+              </div>
+              <ApperIcon name="Wallet" size={24} className="text-green-100 sm:hidden" />
+              <ApperIcon name="Wallet" size={32} className="text-green-100 hidden sm:block" />
             </div>
-          ) : (
-            <div className="space-y-4">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-primary p-2 rounded-lg">
-                      <ApperIcon name="Package" size={16} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Order #{order?.id || 'Unknown'}</p>
-                      <p className="text-sm text-gray-600">{format(new Date(order?.createdAt || new Date()), 'MMM dd, yyyy')}</p>
-                    </div>
-</div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-600">Rs. {(order?.total || 0).toLocaleString()}</p>
-                    <p className="text-sm text-gray-600">{order?.status || 'Unknown'}</p>
-                  </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white p-4 lg:p-6 rounded-xl touch-manipulation">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-xs sm:text-sm">Total Transactions</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold">{(stats?.totalTransactions || 0).toLocaleString()}</p>
+              </div>
+              <ApperIcon name="CreditCard" size={24} className="text-blue-100 sm:hidden" />
+              <ApperIcon name="CreditCard" size={32} className="text-blue-100 hidden sm:block" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-4 lg:p-6 rounded-xl touch-manipulation">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-xs sm:text-sm">Monthly Revenue</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold">Rs. {(stats?.monthlyRevenue || 0).toLocaleString()}</p>
+              </div>
+              <ApperIcon name="TrendingUp" size={24} className="text-purple-100 sm:hidden" />
+              <ApperIcon name="TrendingUp" size={32} className="text-purple-100 hidden sm:block" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-4 lg:p-6 rounded-xl touch-manipulation">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-100 text-xs sm:text-sm">Pending Verifications</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold">{(stats?.pendingVerifications || 0).toLocaleString()}</p>
+              </div>
+              <ApperIcon name="Clock" size={24} className="text-orange-100 sm:hidden" />
+              <ApperIcon name="Clock" size={32} className="text-orange-100 hidden sm:block" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-4 lg:p-6 rounded-xl touch-manipulation">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-emerald-100 text-xs sm:text-sm">Today's Revenue</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold">Rs. {(stats?.todayRevenue || 0).toLocaleString()}</p>
+              </div>
+              <ApperIcon name="DollarSign" size={24} className="text-emerald-100 sm:hidden" />
+              <ApperIcon name="DollarSign" size={32} className="text-emerald-100 hidden sm:block" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-4 lg:p-6 rounded-xl touch-manipulation">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-violet-100 text-xs sm:text-sm">Today's Orders</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold">{(todayOrders?.length || 0).toLocaleString()}</p>
+              </div>
+              <ApperIcon name="ShoppingCart" size={24} className="text-violet-100 sm:hidden" />
+              <ApperIcon name="ShoppingCart" size={32} className="text-violet-100 hidden sm:block" />
+            </div>
+          </div>
+        </div>
+{/* Quick Actions and Recent Orders - Mobile Responsive */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 mb-6 lg:mb-8">
+          {/* Quick Actions */}
+          <div className="card p-4 lg:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6">
+              <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2 sm:mb-0">Quick Actions</h2>
+              <div className="hidden sm:flex items-center space-x-2 text-xs">
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-gray-600">Critical</span>
                 </div>
-              ))}
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <span className="text-gray-600">High</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-gray-600">Medium</span>
+                </div>
+              </div>
             </div>
-          )}
-</div>
-      </div>
+            
+            {/* Mobile Quick Actions Grid */}
+            <div className="lg:hidden">
+              <div className="grid grid-cols-1 gap-3">
+                {quickActions.slice(0, 4).map((action) => {
+                  const badgeCount = notificationCounts[action.notificationKey] || 0;
+                  const priorityInfo = priorityConfig[action.priority];
+                  
+                  return action.isAction ? (
+                    <button
+                      key={action.path}
+                      onClick={() => {
+                        if (action.path === '#vendor-control') {
+                          setShowVendorControl(!showVendorControl);
+                        } else if (action.path === '/order-summary') {
+                          handleOrderSummaryClick();
+                        }
+                      }}
+                      className="group w-full text-left touch-manipulation"
+                      style={{ minHeight: '64px' }}
+                    >
+                      <div className="relative p-4 rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all duration-200">
+                        <div className="flex items-center space-x-4">
+                          <div className={`relative bg-gradient-to-r ${action.color} p-3 rounded-lg`}>
+                            <ApperIcon name={action.icon} size={20} className="text-white" />
+                            {badgeCount > 0 && (
+                              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
+                                {badgeCount > 99 ? '99+' : badgeCount}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-900 group-hover:text-primary transition-colors block text-base">
+                              {action.label}
+                            </span>
+                            <span className={`text-sm ${priorityInfo.textColor} opacity-75`}>
+                              {priorityInfo.text} Priority
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <Link
+                      key={action.path}
+                      to={action.path}
+                      className="group touch-manipulation"
+                      onClick={() => handleTabClick(action.path)}
+                      style={{ minHeight: '64px' }}
+                    >
+                      <div className="relative p-4 rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all duration-200">
+                        <div className="flex items-center space-x-4">
+                          <div className={`relative bg-gradient-to-r ${action.color} p-3 rounded-lg`}>
+                            <ApperIcon name={action.icon} size={20} className="text-white" />
+                            {badgeCount > 0 && (
+                              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
+                                {badgeCount > 99 ? '99+' : badgeCount}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-900 group-hover:text-primary transition-colors block text-base">
+                              {action.label}
+                            </span>
+                            <span className={`text-sm ${priorityInfo.textColor} opacity-75`}>
+                              {priorityInfo.text} Priority
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+                
+                {/* View All Actions Button for Mobile */}
+                <button
+                  onClick={toggleMobileMenu}
+                  className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-primary hover:text-primary transition-colors touch-manipulation"
+                  style={{ minHeight: '64px' }}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <ApperIcon name="Plus" size={20} />
+                    <span className="font-medium">View All Actions</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop Quick Actions Grid */}
+            <div className="hidden lg:block">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {quickActions.map((action) => {
+                  const badgeCount = notificationCounts[action.notificationKey] || 0;
+                  const priorityInfo = priorityConfig[action.priority];
+                  
+                  return action.isAction ? (
+                    <button
+                      key={action.path}
+                      onClick={() => {
+                        if (action.path === '#vendor-control') {
+                          setShowVendorControl(!showVendorControl);
+                        } else if (action.path === '/order-summary') {
+                          handleOrderSummaryClick();
+                        }
+                      }}
+                      className="group w-full text-left"
+                    >
+                      <div className="relative p-4 rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all duration-200">
+                        <div className="absolute top-2 right-2 flex items-center space-x-1">
+                          <div className={`w-2 h-2 ${priorityInfo.color} rounded-full`}></div>
+                          <span className={`text-xs font-medium ${priorityInfo.textColor}`}>
+                            {priorityInfo.text}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 mt-2">
+                          <div className={`relative bg-gradient-to-r ${action.color} p-2 rounded-lg`}>
+                            <ApperIcon name={action.icon} size={20} className="text-white" />
+                            {badgeCount > 0 && (
+                              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
+                                {badgeCount > 99 ? '99+' : badgeCount}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-900 group-hover:text-primary transition-colors block">
+                              {action.label}
+                            </span>
+                            <span className={`text-xs ${priorityInfo.textColor} opacity-75`}>
+                              {priorityInfo.text} Priority
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <Link
+                      key={action.path}
+                      to={action.path}
+                      className="group"
+                      onClick={() => handleTabClick(action.path)}
+                    >
+                      <div className="relative p-4 rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all duration-200">
+                        <div className="absolute top-2 right-2 flex items-center space-x-1">
+                          <div className={`w-2 h-2 ${priorityInfo.color} rounded-full`}></div>
+                          <span className={`text-xs font-medium ${priorityInfo.textColor}`}>
+                            {priorityInfo.text}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 mt-2">
+                          <div className={`relative bg-gradient-to-r ${action.color} p-2 rounded-lg`}>
+                            <ApperIcon name={action.icon} size={20} className="text-white" />
+                            {badgeCount > 0 && (
+                              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center min-w-[20px] shadow-lg">
+                                {badgeCount > 99 ? '99+' : badgeCount}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-900 group-hover:text-primary transition-colors block">
+                              {action.label}
+                            </span>
+                            <span className={`text-xs ${priorityInfo.textColor} opacity-75`}>
+                              {priorityInfo.text} Priority
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+{/* Recent Orders */}
+          <div className="card p-4 lg:p-6">
+            <div className="flex items-center justify-between mb-4 lg:mb-6">
+              <h2 className="text-lg lg:text-xl font-semibold text-gray-900">Recent Orders</h2>
+              <Link to="/orders" className="text-primary hover:text-primary-dark transition-colors text-sm lg:text-base touch-manipulation px-3 py-2 rounded-lg hover:bg-primary/10" style={{ minHeight: '44px' }}>
+                View All
+              </Link>
+            </div>
+            
+            {recentOrders.length === 0 ? (
+              <div className="text-center py-8 lg:py-12">
+                <ApperIcon name="Package" size={48} className="text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 text-sm lg:text-base">No recent orders</p>
+              </div>
+            ) : (
+              <div className="space-y-3 lg:space-y-4">
+                {recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 lg:p-4 bg-gray-50 rounded-lg touch-manipulation hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center space-x-3 lg:space-x-4">
+                      <div className="bg-primary p-2 lg:p-3 rounded-lg">
+                        <ApperIcon name="Package" size={16} className="text-white lg:hidden" />
+                        <ApperIcon name="Package" size={20} className="text-white hidden lg:block" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm lg:text-base">Order #{order?.id || 'Unknown'}</p>
+                        <p className="text-xs lg:text-sm text-gray-600">{format(new Date(order?.createdAt || new Date()), 'MMM dd, yyyy')}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-green-600 text-sm lg:text-base">Rs. {(order?.total || 0).toLocaleString()}</p>
+                      <p className="text-xs lg:text-sm text-gray-600">{order?.status || 'Unknown'}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
       {/* Payment Verification Report Section */}
       <div className="card p-6 mb-8">
@@ -1583,113 +1816,126 @@ action.isAction ? (
           </div>
         )}
       </div>
-{/* Wallet Management */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        {/* Wallet Actions */}
-        <div className="card p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Wallet Management</h2>
-          <div className="space-y-3">
-            <Button
-              onClick={() => handleWalletAction('deposit', 5000)}
-              disabled={walletLoading}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
-            >
-              <ApperIcon name="Plus" size={16} className="mr-2" />
-              Deposit Rs. 5,000
-            </Button>
-            <Button
-              onClick={() => handleWalletAction('withdraw', 1000)}
-              disabled={walletLoading}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
-            >
-              <ApperIcon name="Minus" size={16} className="mr-2" />
-              Withdraw Rs. 1,000
-            </Button>
-            <Button
-              onClick={() => handleWalletAction('transfer', 2000)}
-              disabled={walletLoading}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-            >
-              <ApperIcon name="Send" size={16} className="mr-2" />
-              Transfer Rs. 2,000
-            </Button>
+{/* Wallet Management - Mobile Responsive */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 mb-6 lg:mb-8">
+          {/* Wallet Actions */}
+          <div className="card p-4 lg:p-6">
+            <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-4 lg:mb-6">Wallet Management</h2>
+            <div className="space-y-3 lg:space-y-4">
+              <Button
+                onClick={() => handleWalletAction('deposit', 5000)}
+                disabled={walletLoading}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 touch-manipulation text-sm lg:text-base py-3 lg:py-4"
+                style={{ minHeight: '48px' }}
+              >
+                <ApperIcon name="Plus" size={16} className="mr-2" />
+                Deposit Rs. 5,000
+              </Button>
+              <Button
+                onClick={() => handleWalletAction('withdraw', 1000)}
+                disabled={walletLoading}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 touch-manipulation text-sm lg:text-base py-3 lg:py-4"
+                style={{ minHeight: '48px' }}
+              >
+                <ApperIcon name="Minus" size={16} className="mr-2" />
+                Withdraw Rs. 1,000
+              </Button>
+              <Button
+                onClick={() => handleWalletAction('transfer', 2000)}
+                disabled={walletLoading}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 touch-manipulation text-sm lg:text-base py-3 lg:py-4"
+                style={{ minHeight: '48px' }}
+              >
+                <ApperIcon name="Send" size={16} className="mr-2" />
+                Transfer Rs. 2,000
+              </Button>
+            </div>
+          </div>
+
+          {/* Revenue Breakdown */}
+          <div className="card p-4 lg:p-6">
+            <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-4 lg:mb-6">Revenue by Payment Method</h2>
+            {revenueBreakdown.length === 0 ? (
+              <div className="text-center py-8 lg:py-12">
+                <ApperIcon name="PieChart" size={48} className="text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 text-sm lg:text-base">No revenue data</p>
+              </div>
+            ) : (
+              <div className="space-y-3 lg:space-y-4">
+                {revenueBreakdown.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 lg:p-4 bg-gray-50 rounded-lg touch-manipulation hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center space-x-3 lg:space-x-4">
+                      <div className="bg-primary p-2 lg:p-3 rounded-lg">
+                        <ApperIcon name="CreditCard" size={16} className="text-white lg:hidden" />
+                        <ApperIcon name="CreditCard" size={20} className="text-white hidden lg:block" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 capitalize text-sm lg:text-base">{item?.method || 'Unknown'}</p>
+                        <p className="text-xs lg:text-sm text-gray-600">Payment method</p>
+                      </div>
+                    </div>
+                    <p className="font-medium text-gray-900 text-sm lg:text-base">Rs. {(item?.amount || 0).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Wallet Transactions */}
+          <div className="card p-4 lg:p-6">
+            <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-4 lg:mb-6">Recent Wallet Transactions</h2>
+            {walletTransactions.length === 0 ? (
+              <div className="text-center py-8 lg:py-12">
+                <ApperIcon name="Wallet" size={48} className="text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 text-sm lg:text-base">No wallet transactions</p>
+              </div>
+            ) : (
+              <div className="space-y-3 lg:space-y-4">
+                {walletTransactions.map((transaction) => (
+                  <div key={transaction?.id || transaction?.Id} className="flex items-center justify-between p-3 lg:p-4 bg-gray-50 rounded-lg touch-manipulation hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center space-x-3 lg:space-x-4">
+                      <div className={`p-2 lg:p-3 rounded-lg ${
+                        transaction.type === 'deposit' ? 'bg-green-100' : 
+                        transaction.type === 'withdraw' ? 'bg-red-100' : 'bg-blue-100'
+                      }`}>
+                        <ApperIcon 
+                          name={transaction.type === 'deposit' ? 'ArrowDown' : 
+                                transaction.type === 'withdraw' ? 'ArrowUp' : 'ArrowRight'} 
+                          size={16} 
+                          className={`lg:hidden ${
+                            transaction.type === 'deposit' ? 'text-green-600' : 
+                            transaction.type === 'withdraw' ? 'text-red-600' : 'text-blue-600'
+                          }`} 
+                        />
+                        <ApperIcon 
+                          name={transaction.type === 'deposit' ? 'ArrowDown' : 
+                                transaction.type === 'withdraw' ? 'ArrowUp' : 'ArrowRight'} 
+                          size={20} 
+                          className={`hidden lg:block ${
+                            transaction.type === 'deposit' ? 'text-green-600' : 
+                            transaction.type === 'withdraw' ? 'text-red-600' : 'text-blue-600'
+                          }`} 
+                        />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 capitalize text-sm lg:text-base">{transaction?.type || 'Unknown'}</p>
+                        <p className="text-xs lg:text-sm text-gray-600">
+                          {format(new Date(transaction?.timestamp || new Date()), 'MMM dd, hh:mm a')}
+                        </p>
+                      </div>
+                    </div>
+                    <p className={`font-medium text-sm lg:text-base ${
+                      transaction?.type === 'deposit' ? 'text-green-600' : 
+                      transaction?.type === 'withdraw' ? 'text-red-600' : 'text-blue-600'
+                    }`}>
+                      {transaction?.type === 'deposit' ? '+' : '-'}Rs. {(transaction?.amount || 0).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Revenue Breakdown */}
-        <div className="card p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Revenue by Payment Method</h2>
-          {revenueBreakdown.length === 0 ? (
-            <div className="text-center py-8">
-              <ApperIcon name="PieChart" size={48} className="text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No revenue data</p>
-            </div>
-          ) : (
-<div className="space-y-3">
-              {revenueBreakdown.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-primary p-2 rounded-lg">
-                      <ApperIcon name="CreditCard" size={16} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 capitalize">{item?.method || 'Unknown'}</p>
-                      <p className="text-sm text-gray-600">Payment method</p>
-                    </div>
-                  </div>
-                  <p className="font-medium text-gray-900">Rs. {(item?.amount || 0).toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Wallet Transactions */}
-        <div className="card p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Wallet Transactions</h2>
-          {walletTransactions.length === 0 ? (
-            <div className="text-center py-8">
-              <ApperIcon name="Wallet" size={48} className="text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No wallet transactions</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-{walletTransactions.map((transaction) => (
-                <div key={transaction?.id || transaction?.Id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${
-                      transaction.type === 'deposit' ? 'bg-green-100' : 
-                      transaction.type === 'withdraw' ? 'bg-red-100' : 'bg-blue-100'
-                    }`}>
-                      <ApperIcon 
-                        name={transaction.type === 'deposit' ? 'ArrowDown' : 
-                              transaction.type === 'withdraw' ? 'ArrowUp' : 'ArrowRight'} 
-                        size={16} 
-                        className={
-                          transaction.type === 'deposit' ? 'text-green-600' : 
-                          transaction.type === 'withdraw' ? 'text-red-600' : 'text-blue-600'
-                        } 
-                      />
-                    </div>
-<div>
-                      <p className="font-medium text-gray-900 capitalize">{transaction?.type || 'Unknown'}</p>
-                      <p className="text-sm text-gray-600">
-                        {format(new Date(transaction?.timestamp || new Date()), 'MMM dd, hh:mm a')}
-                      </p>
-                    </div>
-                  </div>
-                  <p className={`font-medium ${
-                    transaction?.type === 'deposit' ? 'text-green-600' : 
-                    transaction?.type === 'withdraw' ? 'text-red-600' : 'text-blue-600'
-                  }`}>
-                    {transaction?.type === 'deposit' ? '+' : '-'}Rs. {(transaction?.amount || 0).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-</div>
-      </div>
 
 {/* Enhanced Approval Workflow Section */}
       <div className="space-y-8 mb-8">
@@ -2544,6 +2790,7 @@ action.isAction ? (
         </div>
       )}
 </div>
+    </div>
   );
 };
 

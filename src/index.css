@@ -282,6 +282,7 @@
   /* Mobile-specific touch targets */
   .touch-manipulation {
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   
   /* Mobile cart bottom spacing */
@@ -302,6 +303,167 @@
   
   .tab-scroll::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Admin Dashboard Mobile Responsiveness */
+  .admin-dashboard-mobile {
+    @apply px-4 py-4;
+  }
+
+  .admin-stats-grid {
+    @apply gap-3;
+  }
+
+  .admin-stat-card {
+    @apply p-4;
+  }
+
+  .admin-stat-title {
+    @apply text-xs;
+  }
+
+  .admin-stat-value {
+    @apply text-lg;
+  }
+
+  .admin-quick-action {
+    @apply p-4 text-base;
+    min-height: 64px;
+  }
+
+  .admin-section-title {
+    @apply text-lg mb-4;
+  }
+
+  /* Mobile Admin Navigation */
+  .mobile-admin-nav {
+    @apply fixed inset-0 z-50;
+  }
+
+  .mobile-admin-nav-backdrop {
+    @apply fixed inset-0 bg-black bg-opacity-50;
+  }
+
+  .mobile-admin-nav-panel {
+    @apply fixed inset-y-0 left-0 w-80 bg-white shadow-xl;
+  }
+
+  .mobile-admin-nav-item {
+    @apply flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 touch-manipulation;
+    min-height: 64px;
+  }
+
+  /* Touch Targets */
+  .admin-touch-target {
+    min-height: 48px;
+    min-width: 48px;
+    @apply touch-manipulation;
+  }
+
+  .admin-button-mobile {
+    @apply py-3 px-4 text-sm;
+    min-height: 48px;
+  }
+
+  /* Responsive Tables */
+  .admin-table-mobile {
+    @apply text-sm;
+  }
+
+  .admin-table-mobile th,
+  .admin-table-mobile td {
+    @apply px-3 py-2;
+  }
+
+  /* Card Spacing */
+  .admin-card-mobile {
+    @apply p-4 mb-4;
+  }
+
+  /* Form Elements */
+  .admin-input-mobile {
+    @apply px-3 py-3 text-base;
+    min-height: 48px;
+  }
+
+  .admin-select-mobile {
+    @apply px-3 py-3 text-base;
+    min-height: 48px;
+  }
+
+  /* Priority Indicators */
+  .priority-indicator-mobile {
+    @apply hidden;
+  }
+
+  /* Mobile-specific animations */
+  .mobile-slide-in {
+    animation: slideInFromRight 0.3s ease-out forwards;
+  }
+
+  .mobile-fade-in {
+    animation: fadeInMobile 0.2s ease-out forwards;
+  }
+}
+
+@keyframes fadeInMobile {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tablet responsive breakpoint */
+@media (min-width: 576px) and (max-width: 992px) {
+  .cart-summary {
+    @apply p-4;
+  }
+  
+  .order-actions {
+    @apply flex-wrap gap-2;
+  }
+  
+  .vendor-section {
+    @apply rounded-lg;
+  }
+  
+  .horizontal-timeline-track {
+    justify-content: center;
+  }
+  
+  .swipe-actions-track {
+    justify-content: center;
+  }
+
+  /* Admin Dashboard Tablet */
+  .admin-dashboard-tablet {
+    @apply px-6 py-6;
+  }
+
+  .admin-stats-tablet {
+    @apply grid-cols-2 gap-4;
+  }
+
+  .admin-actions-tablet {
+    @apply grid-cols-2;
+  }
+
+  .admin-card-tablet {
+    @apply p-5;
+  }
+
+  .admin-button-tablet {
+    @apply py-3 px-5 text-base;
+  }
+
+  /* Touch Targets for Tablet */
+  .admin-touch-tablet {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 
