@@ -4,12 +4,9 @@ import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import App from "@/App";
 import Error from "@/components/ui/Error";
 import { store } from "@/store/index";
-// Polyfill for structuredClone if not available
 if (typeof structuredClone === 'undefined') {
   window.structuredClone = function(obj) {
     if (obj === null || typeof obj !== 'object') return obj;
@@ -127,21 +124,21 @@ function initializeApp() {
     const root = ReactDOM.createRoot(rootElement);
     
     // Render app
-    root.render(
+root.render(
       <Provider store={store}>
-        <App />
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
+        <BrowserRouter>
+          <App />
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#363636',
+                color: '#fff',
+              },
+            }}
+          />
+        </BrowserRouter>
       </Provider>
     );
 
